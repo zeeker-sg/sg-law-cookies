@@ -213,3 +213,33 @@ def test_live_resolve_employment_law():
     assert ref.confidence == 1.0
     assert ref.iri and "openlegalstandard.org" in ref.iri
     assert topic.unresolved == []
+
+
+# ── API failures degrade to unresolved, never crash the run ──────
+
+
+@respx.mock
+def test_folio_500_lands_in_unresolved_not_raise():
+    folio._search_cache.clear()
+    respx.get(f"{FOLIO_API_BASE}/search/query").respond(500)
+    respx.get(f"{FOLIO_API_BASE}/search/label").respond(500)
+    topic = TopicExtraction(
+        headline="h", summary="s", why_it_matters="w", significance="low",
+        raw_areas=["Employment"], raw_entities=["X"], raw_concepts=["duty of care"],
+    )
+    resolved = folio.resolve_topic(topic, httpx.Client())
+    assert "Employment" in resolved.unresolved
+    assert "duty of care" in resolved.unresolved
+    assert resolved.folio_areas == []
+
+
+@respx.mock
+def test_single_char_query_skips_api():
+    folio._search_cache.clear()
+    route = respx.get(f"{FOLIO_API_BASE}/search/label").respond(200, json={"results": []})
+    topic = TopicExtraction(
+        headline="h", summary="s", why_it_matters="w", significance="low",
+        raw_areas=[], raw_entities=["X"], raw_concepts=[],
+    )
+    folio.resolve_topic(topic, httpx.Client())
+    assert not route.called

@@ -67,14 +67,23 @@ def _search_areas(client: httpx.Client, query: str) -> list[SearchResult]:
     key = (query.lower(), _AREAS_QUERY_BRANCH)
     if key in _search_cache:
         return _search_cache[key]
-    resp = client.get(
-        f"{FOLIO_API_BASE}/search/query",
-        params={"label": query, "branch": _AREAS_QUERY_BRANCH, "limit": _SEARCH_LIMIT},
-    )
-    resp.raise_for_status()
+    if len(query.strip()) < 2:
+        _search_cache[key] = []
+        return []
+    try:
+        resp = client.get(
+            f"{FOLIO_API_BASE}/search/query",
+            params={"label": query, "branch": _AREAS_QUERY_BRANCH, "limit": _SEARCH_LIMIT},
+        )
+        resp.raise_for_status()
+        classes = resp.json().get("classes", [])
+    except (httpx.HTTPError, ValueError):
+        # An API failure must not kill the run — the term lands in
+        # `unresolved` and can be re-resolved later (PRD 4.3, 8.2).
+        return []
     results = [
         SearchResult(iri=cls["iri"], label=cls["label"], is_leaf=_is_leaf(cls))
-        for cls in resp.json().get("classes", [])
+        for cls in classes
         if cls.get("iri") and cls.get("label")
     ]
     _search_cache[key] = results
@@ -85,10 +94,17 @@ def _search_all_branches(client: httpx.Client, query: str) -> list[SearchResult]
     key = (query.lower(), None)
     if key in _search_cache:
         return _search_cache[key]
-    resp = client.get(f"{FOLIO_API_BASE}/search/label", params={"query": query})
-    resp.raise_for_status()
+    if len(query.strip()) < 2:
+        _search_cache[key] = []
+        return []
+    try:
+        resp = client.get(f"{FOLIO_API_BASE}/search/label", params={"query": query})
+        resp.raise_for_status()
+        raw = resp.json().get("results", [])
+    except (httpx.HTTPError, ValueError):
+        return []
     results = []
-    for cls, api_score in resp.json().get("results", []):
+    for cls, api_score in raw:
         if not cls.get("iri") or not cls.get("label"):
             continue
         results.append(
