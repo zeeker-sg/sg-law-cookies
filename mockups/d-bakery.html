@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SG Law Cookies — fresh from the oven</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  /* ── tokens lifted from data.zeeker.sg ─────────────── */
+  :root {
+    --color-bg: #F5F2EA;
+    --color-bg-alt: #EEE9DC;
+    --color-surface: #FFFFFF;
+    --color-surface-sunken: #F0ECE0;
+    --color-border: #D9D3C4;
+    --color-border-hover: #B5AD99;
+    --color-text: #14201F;
+    --color-text-secondary: #3E4F4E;
+    --color-text-muted: #6E7A79;
+    --color-text-inverse: #F5F2EA;
+    --color-accent: #0A4F55;
+    --color-accent-hover: #063A3F;
+    --color-accent-soft: #C4D8D9;
+    --color-ochre: #C08A2E;
+    --color-terracotta: #B5552F;
+    --color-ink: #14201F;
+    --font-body: 'Equity OT B', 'Georgia', serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 10px;
+    --tracking-caps: 0.08em;
+    /* bakery extensions */
+    --dough: #E9C887;
+    --dough-deep: #D4A356;
+    --dough-toast: #C68B43;
+    --chip: #4A2E15;
+    --steam: rgba(62, 79, 78, 0.35);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.55;
+  }
+  .shell { max-width: 1140px; margin: 0 auto; padding: 0 26px 72px; }
+  .mono { font-family: var(--font-mono); }
+
+  /* ── header (zeeker-style bar) ─────────────────────── */
+  header.site {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 18px 0; border-bottom: 2px solid var(--color-ink);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand .crumb {
+    width: 30px; height: 30px; border-radius: 50% 46% 52% 48% / 48% 52% 46% 52%;
+    background: radial-gradient(circle at 35% 30%, var(--dough), var(--dough-deep) 80%);
+    border: 1px solid var(--dough-toast);
+    position: relative;
+  }
+  .brand .crumb::before, .brand .crumb::after {
+    content: ""; position: absolute; border-radius: 50%; background: var(--chip);
+  }
+  .brand .crumb::before { width: 5px; height: 5px; top: 7px; left: 9px; }
+  .brand .crumb::after { width: 4px; height: 4px; bottom: 7px; right: 8px; box-shadow: -9px -3px 0 -0.5px var(--chip); }
+  .brand h1 { font-size: 21px; font-weight: 700; letter-spacing: -0.01em; }
+  .brand h1 i { font-style: italic; color: var(--color-terracotta); }
+  nav.site-nav { display: flex; gap: 4px; align-items: center; }
+  nav.site-nav a {
+    font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: var(--tracking-caps);
+    color: var(--color-text-secondary); text-decoration: none; padding: 8px 12px; border-radius: var(--radius-sm);
+  }
+  nav.site-nav a:hover { background: var(--color-bg-alt); color: var(--color-text); }
+  nav.site-nav a.zk {
+    border: 1.5px solid var(--color-accent); color: var(--color-accent); font-weight: 500;
+  }
+  nav.site-nav a.zk:hover { background: var(--color-accent); color: var(--color-text-inverse); }
+
+  /* ── hero strip ────────────────────────────────────── */
+  .hero {
+    padding: 40px 0 8px; display: flex; justify-content: space-between;
+    align-items: flex-end; gap: 30px; flex-wrap: wrap;
+  }
+  .hero .kick {
+    font-family: var(--font-mono); font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.14em; color: var(--color-terracotta); margin-bottom: 12px;
+  }
+  .hero .kick::before { content: "● "; }
+  .hero h2 {
+    font-size: clamp(34px, 5vw, 52px); font-weight: 700; line-height: 1.04; letter-spacing: -0.02em;
+  }
+  .hero h2 b { color: var(--color-accent); }
+  .hero .sub { margin-top: 12px; font-size: 17px; color: var(--color-text-secondary); font-style: italic; }
+  .ovenstats { display: flex; gap: 0; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; background: var(--color-surface); }
+  .ovenstats div { padding: 12px 20px 10px; border-right: 1px solid var(--color-border); text-align: center; }
+  .ovenstats div:last-child { border-right: 0; }
+  .ovenstats b { display: block; font-size: 24px; line-height: 1.1; }
+  .ovenstats span { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--color-text-muted); }
+  .ovenstats .hot b { color: var(--color-terracotta); }
+
+  /* ── THE TRAY: scroll of fresh cookies ─────────────── */
+  .tray-zone { margin-top: 30px; }
+  .tray-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+  .tray-head .t {
+    font-family: var(--font-mono); font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.14em; color: var(--color-text-secondary);
+  }
+  .tray-head .hint { font-size: 13.5px; font-style: italic; color: var(--color-text-muted); }
+  .tray {
+    display: flex; gap: 26px; overflow-x: auto; padding: 26px 8px 20px;
+    scroll-snap-type: x mandatory;
+    background:
+      linear-gradient(var(--color-bg-alt), var(--color-bg-alt)) 0 100% / 100% 58px no-repeat;
+    border-bottom: 2px solid var(--color-border);
+    scrollbar-width: thin; scrollbar-color: var(--color-border-hover) transparent;
+  }
+  .bake { scroll-snap-align: start; flex: 0 0 168px; text-align: center; text-decoration: none; color: var(--color-text); position: relative; }
+  .bake:nth-child(odd) .disc { transform: rotate(-2deg); }
+  .bake:nth-child(3n) .disc { transform: rotate(1.5deg); }
+  .bake:hover .disc { transform: rotate(0) translateY(-6px); }
+  .disc {
+    width: 128px; height: 128px; margin: 0 auto 12px; position: relative;
+    background: radial-gradient(circle at 36% 30%, var(--dough) 30%, var(--dough-deep) 85%);
+    border: 1.5px solid var(--dough-toast);
+    border-radius: 51% 49% 47% 53% / 48% 54% 46% 52%;
+    box-shadow: 0 8px 18px -10px rgba(20, 32, 31, 0.35), inset 0 -5px 12px rgba(178, 121, 47, 0.45);
+    transition: transform 0.22s ease;
+  }
+  /* judgments are hexagonal shortbread (PRD: circles news, hexagons judgments) */
+  .bake.judgment .disc {
+    border-radius: 18px;
+    clip-path: polygon(50% 0%, 96% 25%, 96% 75%, 50% 100%, 4% 75%, 4% 25%);
+    border: none; box-shadow: inset 0 -6px 14px rgba(178, 121, 47, 0.5);
+  }
+  .chips i { position: absolute; border-radius: 50%; background: var(--chip); }
+  .chips i:nth-child(1) { width: 11px; height: 11px; top: 26%; left: 30%; }
+  .chips i:nth-child(2) { width: 8px; height: 8px; top: 50%; left: 62%; }
+  .chips i:nth-child(3) { width: 9px; height: 9px; top: 66%; left: 34%; }
+  .chips i:nth-child(4) { width: 7px; height: 7px; top: 32%; left: 64%; }
+  .chips i:nth-child(5) { width: 6px; height: 6px; top: 55%; left: 18%; }
+  /* toasted edge for high significance + steam */
+  .bake.hot .disc { background: radial-gradient(circle at 36% 30%, var(--dough) 22%, var(--dough-toast) 78%); border-color: var(--color-terracotta); }
+  .steam { position: absolute; top: -16px; left: 50%; width: 0; }
+  .steam i {
+    position: absolute; bottom: 0; width: 7px; height: 22px; border-radius: 8px;
+    background: var(--steam); filter: blur(3px); opacity: 0;
+    animation: waft 2.6s ease-in-out infinite;
+  }
+  .steam i:nth-child(1) { left: -16px; animation-delay: 0s; }
+  .steam i:nth-child(2) { left: -2px; height: 28px; animation-delay: 0.9s; }
+  .steam i:nth-child(3) { left: 11px; animation-delay: 1.7s; }
+  @keyframes waft {
+    0% { opacity: 0; transform: translateY(6px) scaleY(0.7); }
+    35% { opacity: 0.85; }
+    100% { opacity: 0; transform: translateY(-20px) scaleY(1.15); }
+  }
+  .bake .tag {
+    font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: var(--tracking-caps);
+    color: var(--color-terracotta); display: block; margin-bottom: 4px;
+  }
+  .bake.cool .tag { color: var(--color-text-muted); }
+  .bake h4 { font-size: 13.5px; font-weight: 500; line-height: 1.35; letter-spacing: 0; }
+  .bake:hover h4 { text-decoration: underline; text-decoration-color: var(--color-ochre); text-underline-offset: 3px; }
+  .tray-note { margin-top: 10px; font-size: 13px; color: var(--color-text-muted); font-style: italic; }
+  .tray-note b { color: var(--chip); font-style: normal; }
+
+  /* ── act on (zeeker cards, terracotta top) ─────────── */
+  section.zone { margin-top: 52px; }
+  .zone-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 2px solid var(--color-ink); padding-bottom: 8px; margin-bottom: 22px; }
+  .zone-head h3 { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+  .zone-head .n { font-family: var(--font-mono); font-size: 12px; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: var(--tracking-caps); }
+  .zone-head .right { margin-left: auto; font-size: 14px; font-style: italic; color: var(--color-text-muted); }
+
+  .hotgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-top: 3px solid var(--color-accent); border-radius: var(--radius-sm);
+    padding: 24px 26px 20px; transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .card:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -18px rgba(20, 32, 31, 0.35); }
+  .card.hot { border-top-color: var(--color-terracotta); }
+  .card .meta { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: var(--tracking-caps); }
+  .card .meta .sig { color: var(--color-terracotta); font-weight: 700; }
+  .card .meta .kind { color: var(--color-text-muted); }
+  .card h4 { font-size: 21px; font-weight: 700; line-height: 1.3; letter-spacing: -0.01em; }
+  .card .sum { font-size: 15px; color: var(--color-text-secondary); }
+  .card .why {
+    background: var(--color-surface-sunken); border-left: 3px solid var(--color-ochre);
+    border-radius: var(--radius-sm); padding: 10px 14px; font-size: 14px; font-style: italic;
+  }
+  .card .why b { font-family: var(--font-mono); font-style: normal; font-size: 10px; text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--color-ochre); display: block; margin-bottom: 3px; }
+  .card .foot { display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
+  .folio-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .folio-chips span {
+    font-family: var(--font-mono); font-size: 10.5px; padding: 3px 9px;
+    background: var(--color-accent-soft); color: var(--color-accent-hover);
+    border-radius: 999px;
+  }
+  .folio-chips span::before { content: "● "; font-size: 8px; vertical-align: 1px; color: var(--chip); }
+  a.readsrc {
+    font-family: var(--font-mono); font-size: 12px; color: var(--color-accent);
+    text-decoration: none; border: 1.5px solid var(--color-accent); border-radius: var(--radius-sm);
+    padding: 7px 13px; white-space: nowrap; transition: all 0.15s ease;
+  }
+  a.readsrc:hover { background: var(--color-accent); color: var(--color-text-inverse); }
+
+  /* ── worth knowing (rotating accent borders, like zeeker) ── */
+  .medgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 16px; }
+  .mcard {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-top: 3px solid var(--color-accent); border-radius: var(--radius-sm);
+    padding: 18px 20px; text-decoration: none; color: var(--color-text);
+    display: flex; flex-direction: column; gap: 8px;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .mcard:nth-child(3n+2) { border-top-color: var(--color-ochre); }
+  .mcard:nth-child(3n) { border-top-color: var(--color-terracotta); }
+  .mcard:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -16px rgba(20, 32, 31, 0.3); }
+  .mcard .area { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--color-accent); display: flex; justify-content: space-between; }
+  .mcard .area em { font-style: normal; color: var(--color-text-muted); }
+  .mcard h5 { font-size: 16px; font-weight: 500; line-height: 1.4; }
+  .mcard:hover h5 { text-decoration: underline; text-decoration-color: var(--color-ochre); text-underline-offset: 3px; }
+  .mcard .src { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); margin-top: auto; }
+
+  /* cooling rack */
+  details.rack { margin-top: 18px; background: var(--color-bg-alt); border: 1px dashed var(--color-border-hover); border-radius: var(--radius-md); }
+  details.rack summary { cursor: pointer; list-style: none; padding: 15px 20px; display: flex; gap: 12px; align-items: center; font-size: 15px; color: var(--color-text-secondary); }
+  details.rack summary::-webkit-details-marker { display: none; }
+  .rackdots { display: inline-flex; gap: 5px; }
+  .rackdots i { width: 9px; height: 9px; border-radius: 50%; background: var(--dough-deep); border: 1px solid var(--dough-toast); opacity: 0.8; }
+  details.rack summary b { font-family: var(--font-mono); font-size: 14px; }
+  details.rack p { padding: 0 20px 16px 56px; font-size: 14.5px; color: var(--color-text-muted); font-style: italic; }
+  details.rack a { color: var(--color-accent); }
+
+  /* footer */
+  footer { margin-top: 64px; border-top: 2px solid var(--color-ink); padding-top: 22px; display: grid; gap: 12px; font-size: 14px; color: var(--color-text-muted); }
+  footer .disc {
+    background: var(--color-surface-sunken); border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border); padding: 12px 16px;
+    font-style: italic; line-height: 1.6;
+  }
+  footer .row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-family: var(--font-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: var(--tracking-caps); }
+  footer a { color: var(--color-accent); }
+
+  /* entrance */
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .e1,.e2,.e3,.e4,.e5 { opacity: 0; animation: rise 0.6s cubic-bezier(0.2,0.7,0.2,1) forwards; }
+  .e1 { animation-delay: 0.04s; } .e2 { animation-delay: 0.16s; } .e3 { animation-delay: 0.3s; }
+  .e4 { animation-delay: 0.44s; } .e5 { animation-delay: 0.58s; }
+
+  @media (max-width: 860px) { .hotgrid { grid-template-columns: 1fr; } .hero { align-items: flex-start; } }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="site e1">
+    <div class="brand">
+      <span class="crumb"></span>
+      <h1>SG Law Cookies<i>.</i></h1>
+    </div>
+    <nav class="site-nav">
+      <a href="#">Archive</a><a href="#">RSS</a><a href="#">About</a>
+      <a class="zk" href="https://data.zeeker.sg">◆ data.zeeker.sg</a>
+    </nav>
+  </header>
+
+  <section class="hero e2">
+    <div>
+      <p class="kick">Out of the oven 06:02 SGT · Thu 11 Jun 2026</p>
+      <h2><b>23 cookies</b> baked<br>fresh this morning</h2>
+      <p class="sub">Singapore's daily legal output, reduced to the signals worth biting into.</p>
+    </div>
+    <div class="ovenstats mono">
+      <div><b>6</b><span>○ news</span></div>
+      <div><b>17</b><span>⬡ judgments</span></div>
+      <div class="hot"><b>2</b><span>still warm</span></div>
+      <div><b>EMP</b><span>busiest oven</span></div>
+    </div>
+  </section>
+
+  <!-- ── the tray ─────────────────────────────────── -->
+  <section class="tray-zone e3">
+    <div class="tray-head">
+      <span class="t">Today's bake — scroll the tray →</span>
+      <span class="hint">round = news · hexagonal shortbread = judgments · steam = act on it</span>
+    </div>
+    <div class="tray">
+
+      <a class="bake hot judgment" href="https://www.judiciary.gov.sg/" target="_blank">
+        <span class="steam"><i></i><i></i><i></i></span>
+        <span class="disc"><span class="chips"><i></i><i></i><i></i><i></i></span></span>
+        <span class="tag">still warm · [2026] SGCA 31</span>
+        <h4>Arbitral findings can ground abuse-of-process strike-outs</h4>
+      </a>
+
+      <a class="bake hot" href="https://www.mom.gov.sg/" target="_blank">
+        <span class="steam"><i></i><i></i><i></i></span>
+        <span class="disc"><span class="chips"><i></i><i></i><i></i></span></span>
+        <span class="tag">still warm · MOM</span>
+        <h4>EP qualifying salary rises to S$6,000 from Jan 2027</h4>
+      </a>
+
+      <a class="bake" href="https://www.singaporelawwatch.sg/" target="_blank">
+        <span class="disc"><span class="chips"><i></i><i></i><i></i><i></i><i></i></span></span>
+        <span class="tag">fresh · SLW</span>
+        <h4>SingPost executives contest dismissal over whistleblowing report</h4>
+      </a>
+
+      <a class="bake judgment" href="https://www.judiciary.gov.sg/" target="_blank">
+        <span class="disc"><span class="chips"><i></i><i></i><i></i></span></span>
+        <span class="tag">fresh · [2026] SGHC 112</span>
+        <h4>Non-compete unenforceable against departing fund manager</h4>
+      </a>
+
+      <a class="bake judgment" href="https://www.pdpc.gov.sg/" target="_blank">
+        <span class="disc"><span class="chips"><i></i><i></i><i></i><i></i></span></span>
+        <span class="tag">fresh · PDPC</span>
+        <h4>Telehealth provider fined S$58,000 over patient-record breach</h4>
+      </a>
+
+      <a class="bake judgment" href="https://www.judiciary.gov.sg/" target="_blank">
+        <span class="disc"><span class="chips"><i></i><i></i></span></span>
+        <span class="tag">fresh · [2026] SGCA 29</span>
+        <h4>Murder charge reduced on grave and sudden provocation</h4>
+      </a>
+
+      <a class="bake" href="https://www.pdpc.gov.sg/" target="_blank">
+        <span class="disc"><span class="chips"><i></i><i></i><i></i></span></span>
+        <span class="tag">fresh · PDPC</span>
+        <h4>Consultation opens on children's data protection code</h4>
+      </a>
+
+      <a class="bake judgment cool" href="https://www.judiciary.gov.sg/" target="_blank">
+        <span class="disc"><span class="chips"><i></i><i></i></span></span>
+        <span class="tag">tracking · State Courts</span>
+        <h4>Enhanced sentencing framework applied to scam mules</h4>
+      </a>
+
+      <a class="bake cool" href="https://www.singaporelawwatch.sg/" target="_blank">
+        <span class="disc"><span class="chips"><i></i><i></i><i></i></span></span>
+        <span class="tag">tracking · SLW</span>
+        <h4>SingPost declares 9-cent special dividend after divestment</h4>
+      </a>
+
+    </div>
+    <p class="tray-note">The <b>chips</b> on each cookie are its FOLIO concepts — more chips, more doctrine.
+    14 more cookies are cooling on the rack below.</p>
+  </section>
+
+  <!-- ── act on ───────────────────────────────────── -->
+  <section class="zone e4">
+    <div class="zone-head">
+      <h3>Act on</h3><span class="n">2 still warm</span>
+      <span class="right">the ones that change what you do on Monday</span>
+    </div>
+    <div class="hotgrid">
+      <article class="card hot">
+        <div class="meta"><span class="sig">▲ High</span><span class="kind">⬡ judgment · [2026] SGCA 31</span></div>
+        <h4>Arbitral findings can ground abuse-of-process arguments in later litigation</h4>
+        <p class="sum">The Court of Appeal held that findings from a concluded arbitration may found a
+        strike-out of subsequent proceedings under the extended doctrine of abuse of process, even
+        absent strict issue estoppel.</p>
+        <div class="why"><b>Why it matters</b>Re-litigating points lost in arbitration now carries a live
+        strike-out risk — plead around prior awards with care.</div>
+        <div class="foot">
+          <div class="folio-chips"><span>Civil Procedure</span><span>Arbitration</span></div>
+          <a class="readsrc" href="https://www.judiciary.gov.sg/" target="_blank">READ JUDGMENT ↗</a>
+        </div>
+      </article>
+      <article class="card hot">
+        <div class="meta"><span class="sig">▲ High</span><span class="kind">○ news · MOM</span></div>
+        <h4>EP qualifying salary rises to S$6,000 for new applications from January 2027</h4>
+        <p class="sum">MOM will raise the Employment Pass qualifying salary from S$5,600 to S$6,000
+        (S$6,200 in financial services) for new applications from 1 January 2027, renewals from 2028.</p>
+        <div class="why"><b>Why it matters</b>Employers should re-benchmark EP holders against the new
+        floor before the renewal cycle catches them.</div>
+        <div class="foot">
+          <div class="folio-chips"><span>Employment</span><span>Immigration</span></div>
+          <a class="readsrc" href="https://www.mom.gov.sg/" target="_blank">READ SOURCE ↗</a>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ── worth knowing ────────────────────────────── -->
+  <section class="zone e5">
+    <div class="zone-head">
+      <h3>Worth knowing</h3><span class="n">7 fresh</span>
+      <span class="right">update your mental model</span>
+    </div>
+    <div class="medgrid">
+      <a class="mcard" href="https://www.singaporelawwatch.sg/" target="_blank">
+        <span class="area">Employment <em>○ news</em></span>
+        <h5>SingPost executives contest summary dismissal over whistleblowing report handling</h5>
+        <span class="src">singaporelawwatch.sg ↗</span>
+      </a>
+      <a class="mcard" href="https://www.judiciary.gov.sg/" target="_blank">
+        <span class="area">Employment <em>⬡ [2026] SGHC 112</em></span>
+        <h5>High Court declines to enforce 12-month non-compete against departing fund manager</h5>
+        <span class="src">judiciary.gov.sg ↗</span>
+      </a>
+      <a class="mcard" href="https://www.pdpc.gov.sg/" target="_blank">
+        <span class="area">Data Protection <em>⬡ enforcement</em></span>
+        <h5>PDPC fines telehealth provider S$58,000 over unsecured patient-record database</h5>
+        <span class="src">pdpc.gov.sg ↗</span>
+      </a>
+      <a class="mcard" href="https://www.pdpc.gov.sg/" target="_blank">
+        <span class="area">Data Protection <em>○ news</em></span>
+        <h5>PDPC opens consultation on children's data protection code for online services</h5>
+        <span class="src">pdpc.gov.sg ↗</span>
+      </a>
+      <a class="mcard" href="https://www.judiciary.gov.sg/" target="_blank">
+        <span class="area">Criminal <em>⬡ [2026] SGCA 29</em></span>
+        <h5>Court of Appeal reduces murder charge to culpable homicide on grave and sudden provocation</h5>
+        <span class="src">judiciary.gov.sg ↗</span>
+      </a>
+      <a class="mcard" href="https://www.judiciary.gov.sg/" target="_blank">
+        <span class="area">Criminal <em>⬡ judgment</em></span>
+        <h5>State Courts apply enhanced sentencing framework to scam-mule money laundering</h5>
+        <span class="src">judiciary.gov.sg ↗</span>
+      </a>
+      <a class="mcard" href="https://www.singaporelawwatch.sg/" target="_blank">
+        <span class="area">Corporate <em>○ news</em></span>
+        <h5>SingPost declares special dividend of 9 cents following Australian divestment</h5>
+        <span class="src">singaporelawwatch.sg ↗</span>
+      </a>
+    </div>
+
+    <details class="rack">
+      <summary>
+        <span class="rackdots"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span><b class="mono">14</b> on the cooling rack — routine sentencing (6), procedural rulings (5), notices (3)</span>
+      </summary>
+      <p>Day-old cookies don't get thrown out. They keep in the <a href="#">archive</a>, and patterns
+      rise out of them in the weekly bake.</p>
+    </details>
+  </section>
+
+  <footer>
+    <p class="disc">Cookies are LLM-generated signals from public sources and may contain the occasional
+    burnt edge. They are not legal advice — every cookie links to the original judgment or announcement.
+    Read the source.</p>
+    <div class="row">
+      <span>Baked daily from the <a href="https://data.zeeker.sg">data.zeeker.sg</a> catalogue</span>
+      <span><a href="#">About</a> · <a href="#">RSS</a> · no raisins, ever</span>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

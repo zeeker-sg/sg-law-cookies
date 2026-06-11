@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SG Law Cookies — Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:ital,wght@0,400;0,500;0,700;0,900;1,400&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page: #f2f4f1;
+    --card: #ffffff;
+    --ink: #131b18;
+    --ink-soft: #4d5a54;
+    --ink-faint: #8b968f;
+    --line: #dde3dd;
+    --night: #0d2320;        /* evergreen panel */
+    --night-2: #11302b;
+    --lume: #c6f24e;         /* chartreuse */
+    --lume-dim: rgba(198, 242, 78, 0.16);
+    --high: #ff6e5a;         /* coral */
+    --medium: #2fa57f;       /* viridian */
+    --low-dot: #5d7a72;
+    --sans: "Schibsted Grotesk", sans-serif;
+    --mono: "Spline Sans Mono", monospace;
+    --r: 22px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px; line-height: 1.55;
+  }
+  .frame { max-width: 1200px; margin: 0 auto; padding: 26px 28px 80px; }
+
+  /* ── nav ─────────────────────────── */
+  nav {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 22px;
+  }
+  .mark { display: flex; align-items: center; gap: 11px; font-weight: 900; font-size: 18px; letter-spacing: -0.01em; }
+  .mark .bite {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: radial-gradient(circle at 72% 28%, transparent 7px, var(--night) 7.5px);
+  }
+  .navlinks { display: flex; gap: 8px; }
+  .navlinks a {
+    font-family: var(--mono); font-size: 12.5px; text-decoration: none; color: var(--ink-soft);
+    padding: 7px 14px; border-radius: 999px; border: 1px solid transparent;
+    transition: all 0.18s ease;
+  }
+  .navlinks a:hover { border-color: var(--line); background: var(--card); }
+  .navlinks a.zk { border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  .navlinks a.zk::before { content: "◆ "; color: var(--medium); }
+
+  /* ── hero: split light/dark ───────── */
+  .hero { display: grid; grid-template-columns: 380px 1fr; gap: 22px; align-items: stretch; }
+  .intro {
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 34px 6px 10px 2px;
+  }
+  .date-mono { font-family: var(--mono); font-size: 13px; color: var(--ink-faint); letter-spacing: 0.04em; margin-bottom: 18px; }
+  .intro h1 {
+    font-size: clamp(40px, 5vw, 56px); font-weight: 900; line-height: 1.02;
+    letter-spacing: -0.035em; margin-bottom: 18px;
+  }
+  .intro h1 .num { color: var(--medium); }
+  .intro p.tag { color: var(--ink-soft); font-size: 16.5px; max-width: 30ch; }
+  .chips { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 26px; }
+  .chip {
+    font-family: var(--mono); font-size: 12.5px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+    padding: 8px 15px; color: var(--ink-soft);
+  }
+  .chip b { color: var(--ink); font-weight: 600; }
+  .chip.hot { background: var(--high); border-color: var(--high); color: #fff; }
+  .chip.hot b { color: #fff; }
+
+  /* dark panel */
+  .panel {
+    background:
+      radial-gradient(ellipse 80% 60% at 70% 20%, rgba(198, 242, 78, 0.08), transparent 60%),
+      linear-gradient(160deg, var(--night-2), var(--night) 55%);
+    border-radius: var(--r);
+    padding: 28px 30px 18px;
+    color: #e6efe9;
+    position: relative; overflow: hidden;
+    box-shadow: 0 30px 60px -30px rgba(13, 35, 32, 0.45);
+  }
+  .panel-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .panel-head .ttl { font-family: var(--mono); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(230, 239, 233, 0.55); }
+  .panel-head .lvl { font-family: var(--mono); font-size: 11.5px; color: var(--lume); }
+  .panel svg { width: 100%; height: auto; display: block; }
+  .p-lbl { font-family: var(--mono); font-size: 10.5px; fill: rgba(230, 239, 233, 0.62); letter-spacing: 0.07em; }
+  .p-cnt { font-family: var(--sans); font-weight: 700; font-size: 13.5px; fill: #f2f8f4; }
+  @keyframes breathe { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+  .b1 { animation: breathe 5s ease-in-out infinite; }
+  .b2 { animation: breathe 6.5s ease-in-out infinite 1.2s; }
+  @keyframes halo { from { transform: scale(0.9); opacity: 0.8; } to { transform: scale(1.25); opacity: 0; } }
+  .halo { transform-origin: center; transform-box: fill-box; animation: halo 3s ease-out infinite; }
+  .panel-foot {
+    display: flex; justify-content: space-between; font-family: var(--mono);
+    font-size: 11.5px; color: rgba(230, 239, 233, 0.45); padding-top: 8px;
+  }
+  .panel-foot a { color: var(--lume); text-decoration: none; }
+
+  /* ── high signal cards ────────────── */
+  .zone { margin-top: 54px; }
+  .zone-head { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+  .zone-head h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  .zone-head .pill {
+    font-family: var(--mono); font-size: 11.5px; padding: 4px 11px;
+    border-radius: 999px; font-weight: 500;
+  }
+  .pill.coral { background: rgba(255, 110, 90, 0.14); color: #c2412e; }
+  .pill.green { background: rgba(47, 165, 127, 0.13); color: #1d7a5c; }
+  .zone-head .ln { flex: 1; height: 1px; background: var(--line); }
+
+  .hicards { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  .hicard {
+    background: var(--night); color: #eef5f0; border-radius: var(--r);
+    padding: 28px 30px 24px; position: relative; overflow: hidden;
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .hicard::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, var(--high), var(--lume));
+  }
+  .hicard:hover { transform: translateY(-4px); box-shadow: 0 26px 50px -26px rgba(13, 35, 32, 0.6); }
+  .hicard .meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11.5px; }
+  .hicard .meta .sig { color: var(--high); letter-spacing: 0.14em; text-transform: uppercase; }
+  .hicard .meta .kind { color: rgba(238, 245, 240, 0.5); }
+  .hicard h3 { font-size: 21.5px; font-weight: 700; line-height: 1.25; letter-spacing: -0.015em; }
+  .hicard .sum { font-size: 14px; color: rgba(238, 245, 240, 0.72); }
+  .hicard .why {
+    background: var(--lume-dim); border-radius: 12px; padding: 12px 15px;
+    font-size: 13.5px; color: #dff5c0;
+  }
+  .hicard .why b { color: var(--lume); font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; display: block; margin-bottom: 4px; }
+  .hicard .foot { display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
+  .hicard .areas { font-family: var(--mono); font-size: 11.5px; color: rgba(238, 245, 240, 0.5); }
+  .hicard a.go {
+    color: var(--night); background: var(--lume); text-decoration: none;
+    font-weight: 700; font-size: 13.5px; padding: 9px 16px; border-radius: 999px;
+    transition: filter 0.15s ease;
+  }
+  .hicard a.go:hover { filter: brightness(1.08); }
+
+  /* ── medium cards ─────────────────── */
+  .medgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .medcard {
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    padding: 20px 22px; display: flex; flex-direction: column; gap: 9px;
+    text-decoration: none; color: var(--ink);
+    transition: border-color 0.18s ease, transform 0.18s ease;
+  }
+  .medcard:hover { border-color: var(--medium); transform: translateY(-2px); }
+  .medcard .area { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--medium); display: flex; justify-content: space-between; }
+  .medcard .area .kind { color: var(--ink-faint); }
+  .medcard h4 { font-size: 16px; font-weight: 500; line-height: 1.4; letter-spacing: -0.005em; }
+  .medcard .src { font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); margin-top: auto; }
+  .medcard:hover .src { color: var(--medium); }
+
+  /* low strip */
+  .lowband {
+    margin-top: 18px; background: var(--card); border: 1px dashed var(--line); border-radius: 18px;
+  }
+  .lowband summary {
+    cursor: pointer; list-style: none; padding: 17px 22px;
+    display: flex; align-items: center; gap: 13px; font-size: 14.5px; color: var(--ink-soft);
+  }
+  .lowband summary::-webkit-details-marker { display: none; }
+  .dotrow { display: inline-flex; gap: 4px; }
+  .dotrow i { width: 6px; height: 6px; border-radius: 50%; background: var(--low-dot); opacity: 0.5; }
+  .lowband summary .n { font-family: var(--mono); font-weight: 600; color: var(--ink); }
+  .lowband p { padding: 0 22px 18px 51px; font-size: 14px; color: var(--ink-faint); }
+  .lowband p a { color: var(--medium); }
+
+  /* footer */
+  footer { margin-top: 64px; border-top: 1px solid var(--line); padding-top: 26px; display: grid; gap: 12px; font-size: 13.5px; color: var(--ink-faint); }
+  footer .disc {
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.7;
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px;
+  }
+  footer a { color: var(--ink-soft); }
+
+  /* entrance */
+  @keyframes up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  .u1,.u2,.u3,.u4,.u5 { opacity: 0; animation: up 0.65s cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
+  .u1 { animation-delay: 0.04s; } .u2 { animation-delay: 0.16s; } .u3 { animation-delay: 0.3s; }
+  .u4 { animation-delay: 0.44s; } .u5 { animation-delay: 0.58s; }
+
+  @media (max-width: 920px) {
+    .hero { grid-template-columns: 1fr; }
+    .hicards { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <nav class="u1">
+    <div class="mark"><span class="bite"></span> sg law cookies</div>
+    <div class="navlinks">
+      <a href="#">archive</a><a href="#">rss</a><a href="#">about</a>
+      <a class="zk" href="https://data.zeeker.sg">data.zeeker.sg</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="intro u2">
+      <div>
+        <p class="date-mono">THU · 11 JUN 2026 · DAILY EDITION</p>
+        <h1><span class="num">23</span> cookies<br>baked today</h1>
+        <p class="tag">The day's Singapore legal output, reduced to the signals worth your attention.</p>
+      </div>
+      <div class="chips">
+        <span class="chip"><b>6</b> news</span>
+        <span class="chip"><b>17</b> judgments</span>
+        <span class="chip hot"><b>2</b> high signal</span>
+        <span class="chip">busiest · <b>Employment</b></span>
+      </div>
+    </div>
+
+    <div class="panel u3">
+      <div class="panel-head">
+        <span class="ttl">Daily Skyline</span>
+        <span class="lvl">LEVEL 1 / 3 ▸</span>
+      </div>
+      <svg viewBox="0 0 640 360" fill="none" aria-label="Constellation of today's legal activity">
+        <g stroke="rgba(198,242,78,0.16)">
+          <line x1="320" y1="180" x2="180" y2="92"/><line x1="320" y1="180" x2="478" y2="76"/>
+          <line x1="320" y1="180" x2="540" y2="198"/><line x1="320" y1="180" x2="452" y2="292"/>
+          <line x1="320" y1="180" x2="258" y2="304"/><line x1="320" y1="180" x2="118" y2="240"/>
+          <line x1="320" y1="180" x2="84" y2="152"/><line x1="320" y1="180" x2="378" y2="58"/>
+        </g>
+        <circle cx="320" cy="180" r="160" stroke="rgba(230,239,233,0.06)" stroke-dasharray="1 7"/>
+        <!-- centre -->
+        <circle cx="320" cy="180" r="27" fill="rgba(198,242,78,0.07)" stroke="rgba(198,242,78,0.5)"/>
+        <text x="320" y="177" text-anchor="middle" class="p-lbl">JUN</text>
+        <text x="320" y="192" text-anchor="middle" class="p-cnt">11</text>
+        <!-- employment / high -->
+        <circle class="halo" cx="180" cy="92" r="33" stroke="var(--high)" stroke-opacity="0.55" fill="none"/>
+        <circle class="b1" cx="180" cy="92" r="23" fill="rgba(255,110,90,0.16)" stroke="var(--high)"/>
+        <text x="180" y="96" text-anchor="middle" class="p-cnt">6</text>
+        <text x="180" y="138" text-anchor="middle" class="p-lbl">EMPLOYMENT</text>
+        <!-- civ pro / high -->
+        <circle class="halo" cx="478" cy="76" r="27" stroke="var(--high)" stroke-opacity="0.55" fill="none"/>
+        <circle class="b2" cx="478" cy="76" r="18" fill="rgba(255,110,90,0.14)" stroke="var(--high)"/>
+        <text x="478" y="80" text-anchor="middle" class="p-cnt">3</text>
+        <text x="478" y="116" text-anchor="middle" class="p-lbl">CIVIL PROCEDURE</text>
+        <!-- mediums -->
+        <circle class="b1" cx="540" cy="198" r="16" fill="rgba(198,242,78,0.08)" stroke="var(--lume)" stroke-opacity="0.7"/>
+        <text x="540" y="202" text-anchor="middle" class="p-cnt">3</text>
+        <text x="540" y="232" text-anchor="middle" class="p-lbl">DATA PROT.</text>
+        <circle class="b2" cx="452" cy="292" r="18" fill="rgba(198,242,78,0.08)" stroke="var(--lume)" stroke-opacity="0.7"/>
+        <text x="452" y="296" text-anchor="middle" class="p-cnt">4</text>
+        <text x="452" y="328" text-anchor="middle" class="p-lbl">CRIMINAL</text>
+        <circle class="b1" cx="258" cy="304" r="15" fill="rgba(198,242,78,0.07)" stroke="var(--lume)" stroke-opacity="0.6"/>
+        <text x="258" y="308" text-anchor="middle" class="p-cnt">3</text>
+        <text x="258" y="337" text-anchor="middle" class="p-lbl">CORPORATE</text>
+        <circle class="b2" cx="118" cy="240" r="13" fill="rgba(198,242,78,0.06)" stroke="var(--lume)" stroke-opacity="0.55"/>
+        <text x="118" y="244" text-anchor="middle" class="p-cnt">2</text>
+        <text x="118" y="271" text-anchor="middle" class="p-lbl">CONSTRUCTION</text>
+        <circle class="b1" cx="84" cy="152" r="10" fill="rgba(93,122,114,0.25)" stroke="var(--low-dot)"/>
+        <text x="84" y="156" text-anchor="middle" class="p-cnt">1</text>
+        <text x="84" y="130" text-anchor="middle" class="p-lbl">IP</text>
+        <circle class="b2" cx="378" cy="58" r="10" fill="rgba(93,122,114,0.25)" stroke="var(--low-dot)"/>
+        <text x="378" y="62" text-anchor="middle" class="p-cnt">1</text>
+        <text x="378" y="40" text-anchor="middle" class="p-lbl">FAMILY</text>
+      </svg>
+      <div class="panel-foot">
+        <span>● coral = carries high signal</span>
+        <a href="#">explore the constellation →</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="zone u4">
+    <div class="zone-head">
+      <h2>Act on</h2><span class="pill coral">2 high signal</span><div class="ln"></div>
+    </div>
+    <div class="hicards">
+      <article class="hicard">
+        <div class="meta"><span class="sig">● High</span><span class="kind">⬡ judgment · [2026] SGCA 31</span></div>
+        <h3>Arbitral findings can ground abuse-of-process arguments in later litigation</h3>
+        <p class="sum">The Court of Appeal held that findings from a concluded arbitration may found
+        a strike-out of subsequent proceedings under the extended doctrine of abuse of process,
+        even absent strict issue estoppel.</p>
+        <div class="why"><b>Why it matters</b>Re-litigating points lost in arbitration now carries a
+        live strike-out risk — plead around prior awards with care.</div>
+        <div class="foot">
+          <span class="areas">civil procedure · arbitration</span>
+          <a class="go" href="https://www.judiciary.gov.sg/" target="_blank">Read judgment ↗</a>
+        </div>
+      </article>
+      <article class="hicard">
+        <div class="meta"><span class="sig">● High</span><span class="kind">○ news · MOM</span></div>
+        <h3>EP qualifying salary rises to S$6,000 from January 2027</h3>
+        <p class="sum">New Employment Pass applications face a S$6,000 floor (S$6,200 in financial
+        services) from 1 January 2027; renewals follow from 1 January 2028.</p>
+        <div class="why"><b>Why it matters</b>Employers should re-benchmark EP holders against the
+        new floor before the renewal cycle catches them.</div>
+        <div class="foot">
+          <span class="areas">employment · immigration</span>
+          <a class="go" href="https://www.mom.gov.sg/" target="_blank">Read announcement ↗</a>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="zone u5">
+    <div class="zone-head">
+      <h2>Worth knowing</h2><span class="pill green">7 medium</span><div class="ln"></div>
+    </div>
+    <div class="medgrid">
+      <a class="medcard" href="https://www.singaporelawwatch.sg/" target="_blank">
+        <span class="area">Employment <span class="kind">○ news</span></span>
+        <h4>SingPost executives contest summary dismissal over whistleblowing report handling</h4>
+        <span class="src">singaporelawwatch.sg →</span>
+      </a>
+      <a class="medcard" href="https://www.judiciary.gov.sg/" target="_blank">
+        <span class="area">Employment <span class="kind">⬡ [2026] SGHC 112</span></span>
+        <h4>High Court declines to enforce 12-month non-compete against departing fund manager</h4>
+        <span class="src">judiciary.gov.sg →</span>
+      </a>
+      <a class="medcard" href="https://www.pdpc.gov.sg/" target="_blank">
+        <span class="area">Data Protection <span class="kind">⬡ enforcement</span></span>
+        <h4>PDPC fines telehealth provider S$58,000 over unsecured patient-record database</h4>
+        <span class="src">pdpc.gov.sg →</span>
+      </a>
+      <a class="medcard" href="https://www.pdpc.gov.sg/" target="_blank">
+        <span class="area">Data Protection <span class="kind">○ news</span></span>
+        <h4>PDPC opens consultation on children's data protection code for online services</h4>
+        <span class="src">pdpc.gov.sg →</span>
+      </a>
+      <a class="medcard" href="https://www.judiciary.gov.sg/" target="_blank">
+        <span class="area">Criminal <span class="kind">⬡ [2026] SGCA 29</span></span>
+        <h4>Court of Appeal reduces murder charge to culpable homicide on grave and sudden provocation</h4>
+        <span class="src">judiciary.gov.sg →</span>
+      </a>
+      <a class="medcard" href="https://www.judiciary.gov.sg/" target="_blank">
+        <span class="area">Criminal <span class="kind">⬡ judgment</span></span>
+        <h4>State Courts apply enhanced sentencing framework to scam-mule money laundering</h4>
+        <span class="src">judiciary.gov.sg →</span>
+      </a>
+      <a class="medcard" href="https://www.singaporelawwatch.sg/" target="_blank">
+        <span class="area">Corporate <span class="kind">○ news</span></span>
+        <h4>SingPost declares special dividend of 9 cents following Australian divestment</h4>
+        <span class="src">singaporelawwatch.sg →</span>
+      </a>
+    </div>
+
+    <details class="lowband">
+      <summary>
+        <span class="dotrow"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span><span class="n">14</span> tracking signals — routine sentencing (6), procedural rulings (5), notices (3)</span>
+      </summary>
+      <p>Low-signal cookies stay in the database and surface as patterns over time.
+      Browse them in the <a href="#">archive</a> or query them over <a href="#">MCP</a>.</p>
+    </details>
+  </section>
+
+  <footer>
+    <p class="disc">⚠ cookies are LLM-generated signals from public sources and may contain errors.
+    not legal advice — every cookie links to the original document. read the source.</p>
+    <p>catalogue: <a href="https://data.zeeker.sg">data.zeeker.sg</a> — sources link to the original publisher
+    · <a href="#">about</a> · <a href="#">rss</a></p>
+  </footer>
+
+</div>
+</body>
+</html>

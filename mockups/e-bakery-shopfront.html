@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SG Law Cookies — the shopfront</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  /* ── tokens from data.zeeker.sg ──────────────────── */
+  :root {
+    --color-bg: #F5F2EA;
+    --color-bg-alt: #EEE9DC;
+    --color-surface: #FFFFFF;
+    --color-surface-sunken: #F0ECE0;
+    --color-border: #D9D3C4;
+    --color-border-hover: #B5AD99;
+    --color-text: #14201F;
+    --color-text-secondary: #3E4F4E;
+    --color-text-muted: #6E7A79;
+    --color-text-inverse: #F5F2EA;
+    --color-accent: #0A4F55;
+    --color-accent-hover: #063A3F;
+    --color-accent-soft: #C4D8D9;
+    --color-ochre: #C08A2E;
+    --color-terracotta: #B5552F;
+    --color-ink: #14201F;
+    --font-body: 'Equity OT B', 'Georgia', serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --tracking-caps: 0.08em;
+    --dough: #E9C887;
+    --dough-deep: #D4A356;
+    --dough-toast: #C68B43;
+    --chip: #4A2E15;
+    --steam: rgba(62, 79, 78, 0.35);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); font-size: 17px; line-height: 1.55; overflow-x: hidden; }
+  .shell { max-width: 1140px; margin: 0 auto; padding: 0 26px 64px; }
+  .mono { font-family: var(--font-mono); }
+
+  /* ── awning ──────────────────────────────────────── */
+  .awning {
+    height: 16px;
+    background: repeating-linear-gradient(90deg, var(--color-accent) 0 42px, var(--color-bg) 42px 84px);
+  }
+  .awning-scallop {
+    height: 10px; margin-bottom: 4px;
+    background:
+      radial-gradient(circle 10px at 21px -2px, var(--color-accent) 9px, transparent 10px) 0 0 / 84px 12px repeat-x,
+      radial-gradient(circle 10px at 63px -2px, var(--color-bg) 9px, transparent 10px) 0 0 / 84px 12px repeat-x;
+  }
+
+  header.site { display: flex; justify-content: space-between; align-items: center; padding: 20px 0 16px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand .crumb {
+    width: 30px; height: 30px; border-radius: 50% 46% 52% 48% / 48% 52% 46% 52%;
+    background: radial-gradient(circle at 35% 30%, var(--dough), var(--dough-deep) 80%);
+    border: 1px solid var(--dough-toast); position: relative;
+  }
+  .brand .crumb::before, .brand .crumb::after { content: ""; position: absolute; border-radius: 50%; background: var(--chip); }
+  .brand .crumb::before { width: 5px; height: 5px; top: 7px; left: 9px; }
+  .brand .crumb::after { width: 4px; height: 4px; bottom: 7px; right: 8px; box-shadow: -9px -3px 0 -0.5px var(--chip); }
+  .brand h1 { font-size: 21px; font-weight: 700; }
+  .brand h1 i { font-style: italic; color: var(--color-terracotta); }
+  nav.site-nav { display: flex; gap: 4px; }
+  nav.site-nav a {
+    font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: var(--tracking-caps);
+    color: var(--color-text-secondary); text-decoration: none; padding: 8px 12px; border-radius: var(--radius-sm);
+  }
+  nav.site-nav a:hover { background: var(--color-bg-alt); color: var(--color-text); }
+  nav.site-nav a.zk { border: 1.5px solid var(--color-accent); color: var(--color-accent); font-weight: 500; }
+  nav.site-nav a.zk:hover { background: var(--color-accent); color: var(--color-text-inverse); }
+
+  /* ── shop window: bitten counter + docket ────────── */
+  .window { display: grid; grid-template-columns: 1fr 330px; gap: 48px; align-items: center; padding: 36px 0 30px; }
+  .kick { font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-terracotta); margin-bottom: 6px; }
+  .kick::before { content: "● "; }
+  .bignum-row { display: flex; align-items: baseline; gap: 22px; position: relative; }
+  .bignum {
+    font-weight: 700; font-size: clamp(150px, 21vw, 240px); line-height: 0.92; letter-spacing: -0.05em;
+    color: var(--color-ink); position: relative;
+    -webkit-mask-image: radial-gradient(circle 52px at 91% 13%, transparent 50px, black 51px);
+            mask-image: radial-gradient(circle 52px at 91% 13%, transparent 50px, black 51px);
+  }
+  .crumbs i { position: absolute; border-radius: 50%; background: var(--color-ink); }
+  .crumbs i:nth-child(1) { width: 9px; height: 9px; top: -8px; right: -16px; }
+  .crumbs i:nth-child(2) { width: 6px; height: 6px; top: 16px; right: -28px; }
+  .crumbs i:nth-child(3) { width: 4px; height: 4px; top: -20px; right: 6px; }
+  .bignum-cap h2 { font-size: clamp(26px, 3.4vw, 38px); font-weight: 700; line-height: 1.1; letter-spacing: -0.015em; }
+  .bignum-cap h2 em { font-style: italic; color: var(--color-accent); }
+  .bignum-cap p { margin-top: 8px; font-style: italic; color: var(--color-text-secondary); max-width: 26ch; }
+
+  /* docket / receipt */
+  .docket-wrap { position: relative; transform: rotate(1.8deg); }
+  .docket {
+    background: var(--color-surface); padding: 22px 24px 18px;
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--color-text);
+    box-shadow: 0 18px 36px -18px rgba(20, 32, 31, 0.4);
+    -webkit-mask-image:
+      radial-gradient(circle 7px at 10px 0, transparent 6px, black 7px),
+      linear-gradient(black, black);
+    -webkit-mask-size: 20px 14px, 100% calc(100% - 22px);
+    -webkit-mask-position: 0 0, 0 11px;
+    -webkit-mask-repeat: repeat-x, no-repeat;
+            mask-image:
+      radial-gradient(circle 7px at 10px 0, transparent 6px, black 7px),
+      linear-gradient(black, black);
+            mask-size: 20px 14px, 100% calc(100% - 22px);
+            mask-position: 0 0, 0 11px;
+            mask-repeat: repeat-x, no-repeat;
+  }
+  .docket h3 { font-size: 13px; font-weight: 700; text-align: center; letter-spacing: 0.18em; padding-bottom: 10px; }
+  .docket .ln { display: flex; justify-content: space-between; padding: 3.5px 0; }
+  .docket .ln span:last-child { font-weight: 700; }
+  .docket .ln.warm span:last-child { color: var(--color-terracotta); }
+  .docket hr { border: 0; border-top: 1.5px dashed var(--color-border); margin: 9px 0; }
+  .docket .thanks { text-align: center; font-style: italic; font-family: var(--font-body); font-size: 13px; color: var(--color-text-muted); padding-top: 8px; }
+  .stamp {
+    position: absolute; bottom: 34px; right: -14px; transform: rotate(-11deg);
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
+    color: var(--color-terracotta); border: 2.5px solid var(--color-terracotta);
+    border-radius: var(--radius-sm); padding: 5px 10px; opacity: 0.85;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40'%3E%3Cfilter id='r'%3E%3CfeTurbulence baseFrequency='0.6' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.9 0'/%3E%3CfeComposite operator='over' in2='SourceGraphic'/%3E%3C/filter%3E%3Crect width='100' height='40' fill='black' filter='url(%23r)'/%3E%3C/svg%3E");
+  }
+
+  /* ── ticker ──────────────────────────────────────── */
+  .ticker {
+    border-top: 2px solid var(--color-ink); border-bottom: 2px solid var(--color-ink);
+    overflow: hidden; white-space: nowrap; padding: 8px 0; background: var(--color-bg);
+  }
+  .ticker-track { display: inline-block; animation: roll 36s linear infinite; }
+  .ticker:hover .ticker-track { animation-play-state: paused; }
+  @keyframes roll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .ticker span {
+    font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--color-text-secondary); padding: 0 18px;
+  }
+  .ticker b { color: var(--color-accent); font-weight: 700; }
+  .ticker i { font-style: normal; color: var(--color-ochre); }
+
+  /* ── the display case (tray) ─────────────────────── */
+  .case { margin-top: 38px; }
+  .case-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+  .case-head .t { font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-text-secondary); }
+  .case-head .hint { font-size: 13.5px; font-style: italic; color: var(--color-text-muted); }
+  .tray {
+    display: flex; gap: 26px; overflow-x: auto; padding: 26px 10px 0;
+    scroll-snap-type: x mandatory; scrollbar-width: thin; scrollbar-color: var(--color-border-hover) transparent;
+  }
+  /* shelf the cookies sit on */
+  .shelf { height: 14px; border-top: 3px solid var(--color-border-hover); background: linear-gradient(rgba(20,32,31,0.07), transparent); border-radius: 0 0 6px 6px; margin: -34px 10px 0; }
+  .bake { scroll-snap-align: start; flex: 0 0 162px; text-align: center; text-decoration: none; color: var(--color-text); position: relative; padding-bottom: 34px; }
+  .bake:nth-child(odd) .disc { transform: rotate(-2deg); }
+  .bake:nth-child(3n) .disc { transform: rotate(1.5deg); }
+  .bake:hover .disc { transform: rotate(0) translateY(-7px); }
+  .disc {
+    width: 120px; height: 120px; margin: 0 auto 12px; position: relative;
+    background: radial-gradient(circle at 36% 30%, var(--dough) 30%, var(--dough-deep) 85%);
+    border: 1.5px solid var(--dough-toast);
+    border-radius: 51% 49% 47% 53% / 48% 54% 46% 52%;
+    box-shadow: 0 10px 16px -8px rgba(20, 32, 31, 0.4), inset 0 -5px 12px rgba(178, 121, 47, 0.45);
+    transition: transform 0.22s ease;
+  }
+  .bake.judgment .disc {
+    border-radius: 14px;
+    clip-path: polygon(50% 0%, 96% 25%, 96% 75%, 50% 100%, 4% 75%, 4% 25%);
+    border: none; box-shadow: inset 0 -6px 14px rgba(178, 121, 47, 0.5);
+  }
+  .chips i { position: absolute; border-radius: 50%; background: var(--chip); }
+  .chips i:nth-child(1) { width: 11px; height: 11px; top: 26%; left: 30%; }
+  .chips i:nth-child(2) { width: 8px; height: 8px; top: 50%; left: 62%; }
+  .chips i:nth-child(3) { width: 9px; height: 9px; top: 66%; left: 34%; }
+  .chips i:nth-child(4) { width: 7px; height: 7px; top: 32%; left: 64%; }
+  .chips i:nth-child(5) { width: 6px; height: 6px; top: 55%; left: 18%; }
+  /* high significance = pineapple tart: crimped pastry, glossy jam dome */
+  .bake.hot .disc {
+    background: radial-gradient(circle at 50% 42%, #F2DFAC 58%, #E2C282 100%);
+    border: 5px dotted var(--dough-toast);
+    border-radius: 50%;
+    clip-path: none;
+    box-shadow: 0 10px 16px -8px rgba(20, 32, 31, 0.4), inset 0 -4px 10px rgba(178, 121, 47, 0.35);
+  }
+  .bake.hot .disc::after {
+    content: ""; position: absolute; inset: 23%;
+    border-radius: 50%;
+    background:
+      repeating-linear-gradient(45deg, transparent 0 6px, rgba(140, 74, 9, 0.16) 6px 7.5px),
+      repeating-linear-gradient(-45deg, transparent 0 6px, rgba(140, 74, 9, 0.16) 6px 7.5px),
+      radial-gradient(circle at 38% 30%, #F2B348, #D98A12 68%, #B86F08);
+    box-shadow: inset 0 -3px 8px rgba(120, 60, 0, 0.45), 0 2px 6px rgba(120, 60, 0, 0.3);
+  }
+  .steam { position: absolute; top: -14px; left: 50%; width: 0; }
+  .steam i { position: absolute; bottom: 0; width: 7px; height: 22px; border-radius: 8px; background: var(--steam); filter: blur(3px); opacity: 0; animation: waft 2.6s ease-in-out infinite; }
+  .steam i:nth-child(1) { left: -16px; }
+  .steam i:nth-child(2) { left: -2px; height: 28px; animation-delay: 0.9s; }
+  .steam i:nth-child(3) { left: 11px; animation-delay: 1.7s; }
+  @keyframes waft { 0% { opacity: 0; transform: translateY(6px) scaleY(0.7); } 35% { opacity: 0.85; } 100% { opacity: 0; transform: translateY(-20px) scaleY(1.15); } }
+  .bake .tag { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--color-terracotta); display: block; margin-bottom: 4px; }
+  .bake.cool .tag { color: var(--color-text-muted); }
+  .bake h4 { font-size: 13.5px; font-weight: 500; line-height: 1.35; }
+  .bake:hover h4 { text-decoration: underline; text-decoration-color: var(--color-ochre); text-underline-offset: 3px; }
+  .case-note { margin-top: 14px; font-size: 13px; color: var(--color-text-muted); font-style: italic; }
+  .case-note b { color: var(--chip); font-style: normal; }
+
+  /* ── specials board (dark) ───────────────────────── */
+  .board {
+    margin-top: 52px; background: linear-gradient(168deg, #1A2C2A, var(--color-ink) 60%);
+    border-radius: var(--radius-md); padding: 34px 38px 30px; color: var(--color-text-inverse);
+    position: relative; overflow: hidden;
+    box-shadow: 0 28px 50px -28px rgba(20, 32, 31, 0.55);
+  }
+  .board::before { /* chalk dust */
+    content: ""; position: absolute; inset: 0; opacity: 0.5; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)' opacity='0.06'/%3E%3C/svg%3E");
+  }
+  .board-head { display: flex; align-items: center; gap: 18px; margin-bottom: 26px; }
+  .board-head h3 {
+    font-family: var(--font-mono); font-size: 14px; font-weight: 700; letter-spacing: 0.3em;
+    text-transform: uppercase; color: var(--dough);
+  }
+  .board-head .rule { flex: 1; border-top: 1px dashed rgba(245, 242, 234, 0.25); }
+  .board-head .n { font-family: var(--font-mono); font-size: 11.5px; color: rgba(245, 242, 234, 0.55); letter-spacing: var(--tracking-caps); }
+  .special { display: grid; grid-template-columns: 86px 1fr auto; gap: 24px; padding: 22px 0; align-items: start; }
+  .special + .special { border-top: 1px dashed rgba(245, 242, 234, 0.18); }
+  .special .no {
+    font-weight: 700; font-size: 64px; line-height: 0.9; letter-spacing: -0.04em;
+    color: transparent; -webkit-text-stroke: 1.5px var(--color-ochre);
+  }
+  .special .no small { display: block; -webkit-text-stroke: 0; color: rgba(245,242,234,0.4); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; margin-top: 8px; font-weight: 400; }
+  .special h4 { font-size: 22.5px; font-weight: 700; line-height: 1.28; letter-spacing: -0.01em; margin-bottom: 8px; }
+  .special .sum { font-size: 14.5px; color: rgba(245, 242, 234, 0.7); max-width: 62ch; }
+  .special .why { margin-top: 10px; font-size: 14px; font-style: italic; color: var(--dough); }
+  .special .why b { font-family: var(--font-mono); font-style: normal; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-ochre); margin-right: 8px; }
+  .special .side { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+  .special .kind { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: var(--tracking-caps); color: rgba(245, 242, 234, 0.5); }
+  .special a.go {
+    font-family: var(--font-mono); font-size: 12px; text-decoration: none; white-space: nowrap;
+    color: var(--color-ink); background: var(--dough); border-radius: var(--radius-sm);
+    padding: 9px 14px; font-weight: 700; transition: filter 0.15s ease;
+  }
+  .special a.go:hover { filter: brightness(1.07); }
+
+  /* ── the menu (dot leaders) ──────────────────────── */
+  .menu { margin-top: 52px; }
+  .menu-head { text-align: center; margin-bottom: 26px; }
+  .menu-head h3 { font-size: 25px; font-weight: 700; letter-spacing: -0.01em; display: inline-flex; align-items: center; gap: 16px; }
+  .menu-head h3::before, .menu-head h3::after { content: "·──·"; font-family: var(--font-mono); font-size: 13px; color: var(--color-border-hover); letter-spacing: 0; }
+  .menu-head p { font-size: 13.5px; font-style: italic; color: var(--color-text-muted); margin-top: 2px; }
+  .menu-cols { columns: 2; column-gap: 64px; column-rule: 1px dashed var(--color-border); }
+  .menu-sec { break-inside: avoid; margin-bottom: 26px; }
+  .menu-area {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.12em; color: var(--color-accent); margin-bottom: 8px;
+  }
+  .menu-area em { font-style: normal; color: var(--color-text-muted); font-weight: 400; }
+  .mi { display: flex; align-items: baseline; gap: 10px; padding: 6.5px 0; text-decoration: none; color: var(--color-text); }
+  .mi .g { font-size: 12px; color: var(--color-ochre); flex: none; }
+  .mi .h { font-size: 15.5px; line-height: 1.4; }
+  .mi:hover .h { color: var(--color-accent); }
+  .mi .dots { flex: 1; border-bottom: 2px dotted var(--color-border-hover); transform: translateY(-4px); min-width: 24px; }
+  .mi .src { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-muted); flex: none; }
+  .mi:hover .src { color: var(--color-accent); }
+
+  /* cooling rack */
+  .rack { margin-top: 36px; border: 0; }
+  .rack summary {
+    cursor: pointer; list-style: none; display: flex; align-items: center; gap: 14px;
+    padding: 16px 20px; font-size: 15px; color: var(--color-text-secondary);
+    background:
+      repeating-linear-gradient(90deg, transparent 0 14px, var(--color-border) 14px 16px) 0 calc(100% - 8px) / 100% 2px no-repeat,
+      repeating-linear-gradient(90deg, transparent 0 14px, var(--color-border) 14px 16px) 0 8px / 100% 2px no-repeat,
+      var(--color-bg-alt);
+    border-radius: var(--radius-md); border: 1px dashed var(--color-border-hover);
+  }
+  .rack summary::-webkit-details-marker { display: none; }
+  .rackdots { display: inline-flex; gap: 5px; }
+  .rackdots i { width: 10px; height: 10px; border-radius: 50%; background: var(--dough-deep); border: 1px solid var(--dough-toast); }
+  .rack summary b { font-family: var(--font-mono); }
+  .rack p { padding: 12px 20px 4px 58px; font-size: 14.5px; color: var(--color-text-muted); font-style: italic; }
+  .rack a { color: var(--color-accent); }
+
+  /* footer */
+  footer { margin-top: 60px; border-top: 2px solid var(--color-ink); padding-top: 20px; display: grid; gap: 12px; font-size: 14px; color: var(--color-text-muted); }
+  footer .disc { background: var(--color-surface-sunken); border-radius: var(--radius-sm); border: 1px solid var(--color-border); padding: 12px 16px; font-style: italic; line-height: 1.6; }
+  footer .row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-family: var(--font-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: var(--tracking-caps); }
+  footer a { color: var(--color-accent); }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .e1,.e2,.e3,.e4,.e5,.e6 { opacity: 0; animation: rise 0.6s cubic-bezier(0.2,0.7,0.2,1) forwards; }
+  .e1 { animation-delay: 0.04s; } .e2 { animation-delay: 0.16s; } .e3 { animation-delay: 0.28s; }
+  .e4 { animation-delay: 0.4s; } .e5 { animation-delay: 0.52s; } .e6 { animation-delay: 0.64s; }
+
+  @media (max-width: 880px) {
+    .window { grid-template-columns: 1fr; gap: 30px; }
+    .docket-wrap { max-width: 340px; }
+    .menu-cols { columns: 1; }
+    .special { grid-template-columns: 56px 1fr; }
+    .special .no { font-size: 44px; }
+    .special .side { grid-column: 2; flex-direction: row; align-items: center; justify-content: space-between; }
+  }
+</style>
+</head>
+<body>
+
+<div class="awning"></div>
+<div class="awning-scallop"></div>
+
+<div class="shell">
+
+  <header class="site e1">
+    <div class="brand">
+      <span class="crumb"></span>
+      <h1>SG Law Cookies<i>.</i></h1>
+    </div>
+    <nav class="site-nav">
+      <a href="#">Archive</a><a href="#">RSS</a><a href="#">About</a>
+      <a class="zk" href="https://data.zeeker.sg">◆ data.zeeker.sg</a>
+    </nav>
+  </header>
+
+  <!-- ── shop window ────────────────────────────── -->
+  <section class="window">
+    <div class="e2">
+      <p class="kick">Out of the oven 06:02 SGT · Thursday 11 June 2026</p>
+      <div class="bignum-row">
+        <div style="position:relative;">
+          <div class="bignum">23</div>
+          <span class="crumbs"><i></i><i></i><i></i></span>
+        </div>
+        <div class="bignum-cap">
+          <h2>cookies baked<br><em>fresh</em> this morning</h2>
+          <p>Singapore's daily legal output, reduced to the signals worth biting into.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="docket-wrap e3">
+      <div class="docket">
+        <h3>★ THE DAILY BAKE ★</h3>
+        <div class="ln"><span>DATE</span><span>THU 11 JUN 2026</span></div>
+        <div class="ln"><span>OVEN OPENED</span><span>06:02 SGT</span></div>
+        <hr>
+        <div class="ln"><span>○ NEWS</span><span>6</span></div>
+        <div class="ln"><span>⬡ JUDGMENTS</span><span>17</span></div>
+        <div class="ln warm"><span>▲ PINEAPPLE TARTS</span><span>2</span></div>
+        <div class="ln"><span>FRESH</span><span>7</span></div>
+        <div class="ln"><span>COOLING RACK</span><span>14</span></div>
+        <hr>
+        <div class="ln"><span>BUSIEST OVEN</span><span>EMPLOYMENT ×6</span></div>
+        <div class="ln"><span>NEW INGREDIENT</span><span>"WHISTLEBLOWING"</span></div>
+        <hr>
+        <p class="thanks">thank you — come again tomorrow</p>
+      </div>
+      <span class="stamp">FRESHLY LOGGED</span>
+    </div>
+  </section>
+
+  <!-- ── ticker ─────────────────────────────────── -->
+  <div class="ticker e3" aria-hidden="true">
+    <div class="ticker-track">
+      <span>NOW SERVING</span><span><b>EMPLOYMENT</b> ×6</span><span><b>CRIMINAL</b> ×4</span><span><b>DATA PROTECTION</b> ×3</span><span><b>CORPORATE</b> ×3</span><span><b>CIVIL PROCEDURE</b> ×3</span><span><b>CONSTRUCTION</b> ×2</span><span><b>IP</b> ×1</span><span><b>FAMILY</b> ×1</span><span><i>14 JUDGMENTS · 6 HEADLINES · 2 ENFORCEMENT ACTIONS</i></span>
+      <span>NOW SERVING</span><span><b>EMPLOYMENT</b> ×6</span><span><b>CRIMINAL</b> ×4</span><span><b>DATA PROTECTION</b> ×3</span><span><b>CORPORATE</b> ×3</span><span><b>CIVIL PROCEDURE</b> ×3</span><span><b>CONSTRUCTION</b> ×2</span><span><b>IP</b> ×1</span><span><b>FAMILY</b> ×1</span><span><i>14 JUDGMENTS · 6 HEADLINES · 2 ENFORCEMENT ACTIONS</i></span>
+    </div>
+  </div>
+
+  <!-- ── display case ───────────────────────────── -->
+  <section class="case e4">
+    <div class="case-head">
+      <span class="t">The display case — scroll →</span>
+      <span class="hint">pineapple tarts = act on · round = news · hexagonal shortbread = judgments</span>
+    </div>
+    <div class="tray">
+      <a class="bake hot judgment" href="https://www.judiciary.gov.sg/" target="_blank">
+        <span class="steam"><i></i><i></i><i></i></span>
+        <span class="disc"></span>
+        <span class="tag">pineapple tart · [2026] SGCA 31</span>
+        <h4>Arbitral findings can ground abuse-of-process strike-outs</h4>
+      </a>
+      <a class="bake hot" href="https://www.mom.gov.sg/" target="_blank">
+        <span class="steam"><i></i><i></i><i></i></span>
+        <span class="disc"></span>
+        <span class="tag">pineapple tart · MOM</span>
+        <h4>EP qualifying salary rises to S$6,000 from Jan 2027</h4>
+      </a>
+      <a class="bake" href="https://www.singaporelawwatch.sg/" target="_blank">
+        <span class="disc"><span class="chips"><i></i><i></i><i></i><i></i><i></i></span></span>
+        <span class="tag">fresh · SLW</span>
+        <h4>SingPost executives contest dismissal over whistleblowing report</h4>
+      </a>
+      <a class="bake judgment" href="https://www.judiciary.gov.sg/" target="_blank">
+        <span class="disc"><span class="chips"><i></i><i></i><i></i></span></span>
+        <span class="tag">fresh · [2026] SGHC 112</span>
+        <h4>Non-compete unenforceable against departing fund manager</h4>
+      </a>
+      <a class="bake judgment" href="https://www.pdpc.gov.sg/" target="_blank">
+        <span class="disc"><span class="chips"><i></i><i></i><i></i><i></i></span></span>
+        <span class="tag">fresh · PDPC</span>
+        <h4>Telehealth provider fined S$58,000 over patient-record breach</h4>
+      </a>
+      <a class="bake judgment" href="https://www.judiciary.gov.sg/" target="_blank">
+        <span class="disc"><span class="chips"><i></i><i></i></span></span>
+        <span class="tag">fresh · [2026] SGCA 29</span>
+        <h4>Murder charge reduced on grave and sudden provocation</h4>
+      </a>
+      <a class="bake" href="https://www.pdpc.gov.sg/" target="_blank">
+        <span class="disc"><span class="chips"><i></i><i></i><i></i></span></span>
+        <span class="tag">fresh · PDPC</span>
+        <h4>Consultation opens on children's data protection code</h4>
+      </a>
+      <a class="bake judgment cool" href="https://www.judiciary.gov.sg/" target="_blank">
+        <span class="disc"><span class="chips"><i></i><i></i></span></span>
+        <span class="tag">tracking · State Courts</span>
+        <h4>Enhanced sentencing framework applied to scam mules</h4>
+      </a>
+      <a class="bake cool" href="https://www.singaporelawwatch.sg/" target="_blank">
+        <span class="disc"><span class="chips"><i></i><i></i><i></i></span></span>
+        <span class="tag">tracking · SLW</span>
+        <h4>SingPost declares 9-cent special dividend after divestment</h4>
+      </a>
+    </div>
+    <div class="shelf"></div>
+    <p class="case-note">The <b>chips</b> on each cookie are its FOLIO concepts — more chips, more doctrine.
+    Pineapple tarts are reserved for the signals you act on. 14 more bakes are on the cooling rack below.</p>
+  </section>
+
+  <!-- ── today's specials ───────────────────────── -->
+  <section class="board e5">
+    <div class="board-head">
+      <h3>Today's Specials</h3>
+      <span class="rule"></span>
+      <span class="n">the pineapple tarts — they change what you do on Monday</span>
+    </div>
+
+    <article class="special">
+      <div class="no">01<small>⬡ JUDGMENT</small></div>
+      <div>
+        <h4>Arbitral findings can ground abuse-of-process arguments in later litigation</h4>
+        <p class="sum">In [2026] SGCA 31, the Court of Appeal held that findings from a concluded
+        arbitration may found a strike-out of subsequent proceedings under the extended doctrine of
+        abuse of process — even absent strict issue estoppel.</p>
+        <p class="why"><b>Why it matters</b>Re-litigating points lost in arbitration now carries a live
+        strike-out risk. Plead around prior awards with care.</p>
+      </div>
+      <div class="side">
+        <span class="kind">[2026] SGCA 31</span>
+        <a class="go" href="https://www.judiciary.gov.sg/" target="_blank">READ JUDGMENT ↗</a>
+      </div>
+    </article>
+
+    <article class="special">
+      <div class="no">02<small>○ NEWS</small></div>
+      <div>
+        <h4>EP qualifying salary rises to S$6,000 for new applications from January 2027</h4>
+        <p class="sum">MOM will raise the Employment Pass qualifying salary from S$5,600 to S$6,000
+        (S$6,200 in financial services) for new applications from 1 January 2027, renewals from 2028.</p>
+        <p class="why"><b>Why it matters</b>Employers should re-benchmark EP holders against the new
+        floor before the renewal cycle catches them.</p>
+      </div>
+      <div class="side">
+        <span class="kind">MOM · 11 JUN</span>
+        <a class="go" href="https://www.mom.gov.sg/" target="_blank">READ SOURCE ↗</a>
+      </div>
+    </article>
+  </section>
+
+  <!-- ── the menu ───────────────────────────────── -->
+  <section class="menu e6">
+    <div class="menu-head">
+      <h3>The Rest of the Menu</h3>
+      <p>seven fresh cookies, worth knowing — grouped by oven</p>
+    </div>
+    <div class="menu-cols">
+
+      <div class="menu-sec">
+        <div class="menu-area">Employment Law <em>×2</em></div>
+        <a class="mi" href="https://www.singaporelawwatch.sg/" target="_blank">
+          <span class="g">○</span><span class="h">SingPost executives contest summary dismissal over whistleblowing report</span><span class="dots"></span><span class="src">SLW</span>
+        </a>
+        <a class="mi" href="https://www.judiciary.gov.sg/" target="_blank">
+          <span class="g">⬡</span><span class="h">Non-compete unenforceable against departing fund manager</span><span class="dots"></span><span class="src">SGHC 112</span>
+        </a>
+      </div>
+
+      <div class="menu-sec">
+        <div class="menu-area">Data Protection <em>×2</em></div>
+        <a class="mi" href="https://www.pdpc.gov.sg/" target="_blank">
+          <span class="g">⬡</span><span class="h">Telehealth provider fined S$58,000 over unsecured patient records</span><span class="dots"></span><span class="src">PDPC</span>
+        </a>
+        <a class="mi" href="https://www.pdpc.gov.sg/" target="_blank">
+          <span class="g">○</span><span class="h">Consultation opens on children's data protection code</span><span class="dots"></span><span class="src">PDPC</span>
+        </a>
+      </div>
+
+      <div class="menu-sec">
+        <div class="menu-area">Criminal Law <em>×2</em></div>
+        <a class="mi" href="https://www.judiciary.gov.sg/" target="_blank">
+          <span class="g">⬡</span><span class="h">Murder charge reduced to culpable homicide on grave and sudden provocation</span><span class="dots"></span><span class="src">SGCA 29</span>
+        </a>
+        <a class="mi" href="https://www.judiciary.gov.sg/" target="_blank">
+          <span class="g">⬡</span><span class="h">Enhanced sentencing framework applied to scam-mule laundering</span><span class="dots"></span><span class="src">STATE CTS</span>
+        </a>
+      </div>
+
+      <div class="menu-sec">
+        <div class="menu-area">Corporate <em>×1</em></div>
+        <a class="mi" href="https://www.singaporelawwatch.sg/" target="_blank">
+          <span class="g">○</span><span class="h">SingPost declares 9-cent special dividend after Australian divestment</span><span class="dots"></span><span class="src">SLW</span>
+        </a>
+      </div>
+
+    </div>
+
+    <details class="rack">
+      <summary>
+        <span class="rackdots"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span><b>14</b> on the cooling rack — routine sentencing (6), procedural rulings (5), notices (3)</span>
+      </summary>
+      <p>Day-old cookies don't get thrown out. They keep in the <a href="#">archive</a>, and patterns
+      rise out of them in the weekly bake.</p>
+    </details>
+  </section>
+
+  <footer>
+    <p class="disc">Cookies are LLM-generated signals from public sources and may contain the occasional
+    burnt edge. They are not legal advice — every cookie links to the original judgment or announcement.
+    Read the source.</p>
+    <div class="row">
+      <span>Baked daily from the <a href="https://data.zeeker.sg">data.zeeker.sg</a> catalogue</span>
+      <span><a href="#">About</a> · <a href="#">RSS</a> · no raisins, ever</span>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>
