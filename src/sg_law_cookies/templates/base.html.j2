@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}SG Law Cookies — fresh legal signals, baked daily{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&family=Yellowtail&display=swap" rel="stylesheet">
+<link rel="alternate" type="application/rss+xml" title="SG Law Cookies" href="/feed.xml">
+<link rel="stylesheet" href="{{ css_href | default('/static/site.css') }}">
+{% block head %}{% endblock %}
+</head>
+<body>
+
+<!-- ceiling + pipe -->
+<div class="ceiling"><div class="pipe"></div></div>
+
+<!-- signboard -->
+<div class="signboard-wrap">
+  <div class="shell">
+    <div class="signboard e1">
+      <div class="sign-left">
+        <span class="crumb-logo"><i></i><i></i><i></i></span>
+        <span class="sign-name">SG Law <b>Cookies</b></span>
+      </div>
+      <div style="display:flex; align-items:center;">
+        <span class="sign-divider"></span>
+        <span class="sign-cjk">法律饼家</span>
+      </div>
+      <span class="sign-unit">#01-LAW</span>
+    </div>
+    <div class="under-sign e1">
+      <span class="est">est. 2020 · baked daily, no holidays</span>
+      <nav class="site-nav">
+        <a href="/d/">Archive</a><a href="/feed.xml">RSS</a><a href="/about/">About</a>
+        <a class="zk" href="https://data.zeeker.sg">◆ data.zeeker.sg</a>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+
+{% block content %}{% endblock %}
+
+  <!-- colophon -->
+  <footer>
+    <div class="colophon">
+      <p class="disclaimer">Cookies are LLM-generated signals from public sources and may contain the occasional
+      burnt edge. They are not legal advice — every cookie links to the original judgment or announcement.
+      Read the source.</p>
+      <div class="row">
+        <span>Baked daily from the <a href="https://data.zeeker.sg">data.zeeker.sg</a> catalogue</span>
+        <span><a href="/about/">About</a> · <a href="/feed.xml">RSS</a> · no raisins, ever</span>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<!-- the five-foot way -->
+<div class="mosaic"></div>
+<div class="bricks"></div>
+
+</body>
+</html>

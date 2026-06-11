@@ -1,0 +1,161 @@
+{% extends "base.html.j2" %}
+{% from "_macros.html.j2" import bake, ticker_spans, kind_glyph %}
+
+{% block title %}{{ date_long }} — SG Law Cookies{% endblock %}
+
+{% block content %}
+  <!-- shop window -->
+  <section class="window">
+    <div class="e2">
+      {% if oven_time %}
+      <div class="hangsign-wrap">
+        <div class="hangsign">
+          <div class="l1">FRESH BATCH · {{ oven_time }}</div>
+          <div class="l2">SELF SERVICE · 自助服务</div>
+        </div>
+      </div>
+      {% endif %}
+      <div class="count-row">
+        <div class="count-card">
+          <b>{{ totals.total }}</b>
+          <span>cookies {{ 'today' if is_today else 'that day' }}</span>
+        </div>
+        <div class="count-cap">
+          <h2>baked <em>fresh</em><br>{{ 'this' if is_today else 'that' }} morning</h2>
+          <p>Singapore's daily legal output, reduced to the signals worth biting into.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="docket-wrap e3">
+      <div class="docket">
+        <h3>★ THE DAILY BAKE ★</h3>
+        <div class="ln"><span>DATE</span><span>{{ date_display }}</span></div>
+        {% if oven_time %}<div class="ln"><span>OVEN OPENED</span><span>{{ oven_time }}</span></div>{% endif %}
+        <hr>
+        <div class="ln"><span>○ NEWS</span><span>{{ totals.news }}</span></div>
+        <div class="ln"><span>⬡ JUDGMENTS</span><span>{{ totals.judgments }}</span></div>
+        <div class="ln warm"><span>▲ PINEAPPLE TARTS</span><span>{{ totals.high }}</span></div>
+        <div class="ln"><span>FRESH</span><span>{{ totals.medium }}</span></div>
+        <div class="ln"><span>COOLING RACK</span><span>{{ totals.low }}</span></div>
+        {% if busiest_area or new_ingredient %}
+        <hr>
+        {% if busiest_area %}
+        {% set busiest_count = areas_ticker | selectattr('label', 'equalto', busiest_area | upper) | map(attribute='count') | list | first | default(none) %}
+        <div class="ln"><span>BUSIEST OVEN</span><span>{{ busiest_area | upper }}{% if busiest_count %} ×{{ busiest_count }}{% endif %}</span></div>
+        {% endif %}
+        {% if new_ingredient %}<div class="ln"><span>NEW INGREDIENT</span><span>"{{ new_ingredient | upper }}"</span></div>{% endif %}
+        {% endif %}
+        <hr>
+        <p class="thanks">thank you — come again tomorrow</p>
+      </div>
+      <span class="stamp">FRESHLY LOGGED</span>
+    </div>
+  </section>
+
+  {% if areas_ticker %}
+  <!-- the pan -->
+  <div class="e3">
+    <div class="pan" aria-hidden="true">
+      <div class="pan-inner">
+        <div class="pan-track">
+          {{ ticker_spans(areas_ticker, totals) }}
+          {{ ticker_spans(areas_ticker, totals) }}
+        </div>
+      </div>
+    </div>
+    <p class="pan-label">straight from the oven, tray by tray</p>
+  </div>
+  {% endif %}
+
+  <!-- display case -->
+  <section class="case e4">
+    {% if prev_date or next_date %}
+    <nav class="case-nav">
+      {% if prev_date %}<a href="/d/{{ prev_date }}/" rel="prev">← {{ prev_date }}</a>{% endif %}
+      {% if next_date %}<a href="/d/{{ next_date }}/" rel="next">{{ next_date }} →</a>{% endif %}
+    </nav>
+    {% endif %}
+    {% if tray %}
+    <div class="case-frame">
+      <div class="case-glass">
+        <span class="case-title">DISPLAY CASE · SCROLL →</span>
+        <div class="tray-scroll">
+          {% for item in tray %}
+          {{ bake(item) }}
+          {% endfor %}
+        </div>
+        <div class="shelf-bar"></div>
+      </div>
+    </div>
+    <p class="case-note">The <b>chips</b> on each cookie are its FOLIO concepts — more chips, more doctrine.
+    Pineapple tarts are reserved for the signals you act on.{% if rack and rack.count %} {{ rack.count }} more bake{{ 's are' if rack.count != 1 else ' is' }} on the cooling rack below.{% endif %}</p>
+    {% elif totals.total == 0 %}
+    <p class="case-note">The oven's warming up — no cookies logged yet. Come back after the morning bake.</p>
+    {% else %}
+    <p class="case-note">The display case is empty — the oven rested {{ 'today' if is_today else 'that day' }}. Come again tomorrow.</p>
+    {% endif %}
+  </section>
+
+  {% if specials %}
+  <!-- specials board -->
+  <section class="board e5">
+    <div class="board-head">
+      <h3>Today's Specials</h3>
+      <span class="rule"></span>
+      <span class="n">the pineapple tarts — they change what you do on Monday</span>
+    </div>
+    {% for s in specials %}
+    <article class="special">
+      <div class="no">{{ '%02d' | format(loop.index) }}<small>{{ kind_glyph(s.kind) }} {{ 'JUDGMENT' if s.kind == 'judgment' else 'NEWS' }}</small></div>
+      <div>
+        <h4>{{ s.headline }}</h4>
+        <p class="sum">{{ s.summary }}</p>
+        {% if s.why_it_matters %}<p class="why"><b>Why it matters</b>{{ s.why_it_matters }}</p>{% endif %}
+      </div>
+      <div class="side">
+        <span class="kind">{{ s.source_label | upper }}</span>
+        <a class="go" href="{{ s.source_url }}" target="_blank" rel="noopener">READ {{ 'JUDGMENT' if s.kind == 'judgment' else 'SOURCE' }} ↗</a>
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if menu or (rack and rack.count) %}
+  <!-- the menu + cooling rack -->
+  <section class="menu e6">
+    {% if menu %}
+    {% set ns = namespace(n=0) %}
+    {% for g in menu %}{% set ns.n = ns.n + (g['items'] | length) %}{% endfor %}
+    <div class="menu-head">
+      <h3>The Rest of the Menu</h3>
+      <p>{{ ns.n }} fresh cookie{{ 's' if ns.n != 1 }}, worth knowing — grouped by oven</p>
+    </div>
+    <div class="menu-cols">
+      {% for g in menu %}
+      <div class="menu-sec">
+        <div class="menu-area">{{ g.area }} <em>×{{ g['items'] | length }}</em></div>
+        {% for it in g['items'] %}
+        <a class="mi" href="{{ it.source_url }}" target="_blank" rel="noopener">
+          <span class="g">{{ kind_glyph(it.kind) }}</span><span class="h">{{ it.headline }}</span><span class="dots"></span><span class="src">{{ it.src_short | upper }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if rack and rack.count %}
+    <details class="rack">
+      <summary>
+        <span class="rackdots">{% for _ in range([rack.count, 6] | min) %}<i></i>{% endfor %}</span>
+        <span><b>{{ rack.count }}</b> on the cooling rack{% if rack.breakdown %} — {{ rack.breakdown }}{% endif %}</span>
+      </summary>
+      <p>Day-old cookies don't get thrown out. They keep in the <a href="/d/">archive</a>, and patterns
+      rise out of them in the weekly bake.</p>
+    </details>
+    {% endif %}
+  </section>
+  {% endif %}
+{% endblock %}

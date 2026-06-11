@@ -1,0 +1,49 @@
+{# Shared macros for the bakery shopfront. Markup mirrors the approved
+   mockup mockups/f-bakery-lovecon.html exactly (PRD §6.1). #}
+
+{# Price text encodes significance: pineapple tart = act on,
+   $0.60 fresh = medium, $0.30 tracking = low. #}
+{% macro price_text(significance) -%}
+{%- if significance == 'high' -%}PINEAPPLE TART · ACT ON
+{%- elif significance == 'low' -%}$0.30 · TRACKING
+{%- else -%}$0.60 · FRESH
+{%- endif -%}
+{%- endmacro %}
+
+{# Glyph for a cookie kind: round bake = news, hex shortbread = judgment. #}
+{% macro kind_glyph(kind) -%}
+{{- '⬡' if kind == 'judgment' else '○' -}}
+{%- endmacro %}
+
+{# One bake in the display case: alu tray + cookie + yellow price card.
+   - hot (high significance) = pineapple tart, gets steam, no chips
+   - judgment = hexagonal shortbread; cool (low) = muted price
+   - chips (1..5) are the cookie's FOLIO concepts
+   - link is ALWAYS the cookie's ORIGINAL source_url, never Zeeker. #}
+{% macro bake(item) -%}
+<a class="bake{{ ' hot' if item.significance == 'high' }}{{ ' cool' if item.significance == 'low' }}{{ ' judgment' if item.kind == 'judgment' }}" href="{{ item.source_url }}" target="_blank" rel="noopener">
+  <div class="alutray">
+    {%- if item.significance == 'high' %}
+    <span class="steam"><i></i><i></i><i></i></span>
+    <span class="disc"></span>
+    {%- else %}
+    <span class="disc"><span class="chips">{% for _ in range(item.chips) %}<i></i>{% endfor %}</span></span>
+    {%- endif %}
+  </div>
+  <span class="pricecard">
+    <span class="nm">{{ item.headline }}</span>
+    <span class="ar">{% if item.area %}{{ item.area }} · {% endif %}{{ item.source_label }}</span>
+    <span class="pr">{{ price_text(item.significance) }}</span>
+  </span>
+</a>
+{%- endmacro %}
+
+{# One pass of the pan ticker. The caller renders this TWICE inside
+   .pan-track so the -50% translateX loop animation is seamless. #}
+{% macro ticker_spans(areas_ticker, totals) -%}
+<span>NOW SERVING</span>
+{%- for a in areas_ticker -%}
+<span><b>{{ a.label }}</b> ×{{ a.count }}</span>
+{%- endfor -%}
+<span><i>{{ totals.judgments }} JUDGMENT{{ 'S' if totals.judgments != 1 }} · {{ totals.news }} HEADLINE{{ 'S' if totals.news != 1 }}</i></span>
+{%- endmacro %}

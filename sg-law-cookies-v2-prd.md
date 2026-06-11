@@ -464,24 +464,32 @@ stories" (every legal news service does that). Instead, a
 **Tone:** Light, informative, almost playful. The kind of thing you
 glance at over coffee.
 
-**Look.** Visual quality is an explicit product concern, not an
-afterthought: the site must read as a polished data product, not a
-default static-site theme. Scale and trust are communicated
-visually before a single cookie is read. Direction:
+**Look (settled, June 2026).** The site is a **traditional Singapore
+bakery shopfront** built on data.zeeker.sg's design tokens — visual
+kinship with Zeeker is a requirement (this is its showcase), and the
+reference is Love Confectionery in Ang Mo Kio. Approved mockup:
+`mockups/f-bakery-lovecon.html`. The component vocabulary:
 
-- A small design system defined before any templates are written:
-  typography scale, colour palette, spacing tokens, and a cookie
-  card component — reused across blog pages, constellation, and
-  (later) email templates.
-- One palette shared between the page chrome and the
-  constellation, so homepage and visualisation feel like a single
-  product. Significance levels map to the same colours everywhere.
-- Restrained, editorial typography; generous whitespace;
-  mobile-first layout.
-- Canvas decision made early: constellations read naturally on a
-  dark background, while an over-coffee editorial product often
-  reads better light. Pick one (or design both) before Phase 2
-  locks the templates.
+- **Signboard** header: cream panel, brush-script wordmark, red
+  法律饼家, unit number; yellow ceiling pipe above.
+- **Yellow price cards** for counts and per-cookie labels; price
+  encodes significance (pineapple tart = act on, $0.60 fresh,
+  $0.30 tracking).
+- **Display case** as the daily scroll: walnut frame, glass
+  reflections, aluminium trays, one bake per cookie. Round = news,
+  hexagonal shortbread = judgments, **pineapple tart = high
+  significance** (overrides shape). Chocolate chips = FOLIO
+  concepts. Steam = still warm.
+- **Baker's docket** (perforated receipt) for daily stats,
+  including the day's "new ingredient" (an unresolved FOLIO term).
+- **Pan ticker**: aluminium tray marquee of areas with counts.
+- **Specials board** (dark ink panel) for high-significance
+  cookies; **dot-leader menu** grouped by area for mediums;
+  **cooling rack** strip for lows; mosaic kerb + brick five-foot
+  way at the page foot.
+- Light canvas throughout; teal/ochre/terracotta from Zeeker's
+  palette; serif body + JetBrains Mono labels. The constellation
+  (Phase 5+) lives on its own page, linked from the homepage.
 
 **Content:**
 - Daily stats: total cookies, news vs. judgment split, area breakdown
@@ -761,9 +769,8 @@ natural stopping point with a working product.
 ### Phase 2 — Blog Output
 **Goal:** Replace Hugo with a Python-generated static site that
 looks like a designed product from day one.
-- Define the design system first (§6.1 "Look"): typography scale,
-  colour palette shared with the future constellation, spacing
-  tokens, cookie card component
+- Extract the design system from the approved mockup
+  (`mockups/f-bakery-lovecon.html`) into tokens + component CSS
 - Jinja2 templates for the daily cookie page, built on those tokens
 - Data-focused daily digest format (stats + high-significance one-liners)
 - Static site generation from database
@@ -880,12 +887,11 @@ the separate subscription app once it reaches production.
   many-issue judgment can exceed the 8-call estimate.
 
 ### Design
-- The site's look is a stated concern (§6.1 "Look"). Is the design
-  system built in-house from tokens and templates, or is a designer
-  engaged for identity work (logo, palette, constellation art
-  direction)?
-- Light vs. dark canvas — decide before Phase 2 templates are
-  locked.
+- Direction settled (§6.1): bakery-shopfront on Zeeker tokens,
+  approved mockup `mockups/f-bakery-lovecon.html`. Remaining:
+  whether to engage a designer for identity polish (logo, signboard
+  lettering) once the built site is live, and how the constellation
+  page adopts the shopfront vocabulary.
 
 ### Visualisation
 - What is the right balance between information density and

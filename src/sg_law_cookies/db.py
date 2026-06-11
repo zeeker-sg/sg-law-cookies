@@ -419,6 +419,74 @@ def get_daily_stats(conn: sqlite3.Connection, day: date) -> DailyStats | None:
     )
 
 
+# ── site read queries (sitegen / feed) ───────────────────────────────
+
+
+def list_cookie_dates(conn: sqlite3.Connection) -> list[str]:
+    """Distinct ISO days (date(created_at)) that have cookies, newest first."""
+    return [
+        row["day"]
+        for row in conn.execute(
+            "SELECT DISTINCT date(created_at) AS day FROM cookies ORDER BY day DESC"
+        )
+    ]
+
+
+def cookies_for_date(conn: sqlite3.Connection, day: date) -> list[Cookie]:
+    """All cookies created on the given day, oldest first.
+
+    Includes duplicate-flagged cookies; filtering is left to the caller.
+    """
+    rows = conn.execute(
+        "SELECT * FROM cookies WHERE date(created_at) = ? ORDER BY created_at, id",
+        (day.isoformat(),),
+    ).fetchall()
+    return [_row_to_cookie(conn, row) for row in rows]
+
+
+def sources_for_cookies(
+    conn: sqlite3.Connection, cookie_ids: list[str]
+) -> dict[str, list[Source]]:
+    """Map cookie id -> its Sources via the cookie_sources join.
+
+    Source.source_url is the ORIGINAL document URL (never a Zeeker URL);
+    use it for all outbound links (PRD §2.5). Every requested id is a key,
+    even when it has no sources.
+    """
+    result: dict[str, list[Source]] = {cid: [] for cid in cookie_ids}
+    if not cookie_ids:
+        return result
+    placeholders = ", ".join("?" for _ in cookie_ids)
+    rows = conn.execute(
+        f"""
+        SELECT cs.cookie_id AS link_cookie_id, s.*
+        FROM sources s
+        JOIN cookie_sources cs ON cs.source_id = s.id
+        WHERE cs.cookie_id IN ({placeholders})
+        ORDER BY cs.cookie_id, s.ingested_at, s.id
+        """,
+        list(cookie_ids),
+    ).fetchall()
+    for row in rows:
+        result[row["link_cookie_id"]].append(_row_to_source(row))
+    return result
+
+
+def latest_unresolved_terms(conn: sqlite3.Connection, day: date) -> list[str]:
+    """Unresolved FOLIO terms first seen on the given day, most frequent first."""
+    return [
+        row["term"]
+        for row in conn.execute(
+            """
+            SELECT term FROM unresolved_terms
+            WHERE first_seen_date = ?
+            ORDER BY count DESC, term
+            """,
+            (day.isoformat(),),
+        )
+    ]
+
+
 def compute_daily_stats(conn: sqlite3.Connection, day: date) -> DailyStats:
     """Compute stats over cookies created on the given date."""
     day_iso = day.isoformat()

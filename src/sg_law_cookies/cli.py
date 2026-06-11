@@ -1,8 +1,10 @@
 """Command-line entry point: init-db, discover, run, stats (PRD section 8)."""
 
 import argparse
+import os
 import sys
 from datetime import date
+from pathlib import Path
 
 import anthropic
 import httpx
@@ -12,6 +14,7 @@ from sg_law_cookies.config import Settings, load_settings
 from sg_law_cookies.llm import AnthropicBackend, OllamaBackend
 from sg_law_cookies.models import SourceRegistryEntry
 from sg_law_cookies.pipeline import PipelineError, run_source
+from sg_law_cookies.sitegen import build_site
 from sg_law_cookies.zeeker import ZeekerClient, item_type_for
 
 
@@ -120,6 +123,15 @@ def _cmd_stats(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _cmd_build(args: argparse.Namespace, settings: Settings) -> int:
+    conn = db.init_db(settings.db_path)
+    report = build_site(conn, Path(args.out), args.base_url)
+    for warning in report.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
+    print(f"built {report.pages} pages ({len(report.dates)} days) -> {args.out}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cookies", description="SG Law Cookies pipeline")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -149,6 +161,15 @@ def build_parser() -> argparse.ArgumentParser:
     stats_p = sub.add_parser("stats", help="compute and store daily stats")
     stats_p.add_argument("--date", help="YYYY-MM-DD (default: today)")
     stats_p.set_defaults(func=_cmd_stats)
+
+    build_p = sub.add_parser("build", help="render the static site")
+    build_p.add_argument("--out", default="./dist", help="output directory (default ./dist)")
+    build_p.add_argument(
+        "--base-url",
+        default=os.environ.get("COOKIES_BASE_URL", "https://example.org"),
+        help="canonical site base URL (default $COOKIES_BASE_URL or https://example.org)",
+    )
+    build_p.set_defaults(func=_cmd_build)
 
     return parser
 
