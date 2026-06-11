@@ -1,0 +1,89 @@
+"""Pluggable LLM backends for the extraction step.
+
+Anthropic is the primary backend (tool use forces schema conformance).
+Ollama is a local alternative for dev and cost-free runs: its /api/chat
+endpoint accepts the same JSON schema in the `format` field, so both
+backends produce identical TopicExtraction lists.
+"""
+
+import json
+from typing import Protocol
+
+import anthropic
+import httpx
+
+from sg_law_cookies.extraction import (
+    DEFAULT_MODEL,
+    NEWS_EXTRACTION_TOOL,
+    ExtractionError,
+    extract_news,
+    format_news_user_prompt,
+)
+from sg_law_cookies.models import RawItem, TopicExtraction
+from sg_law_cookies.prompts import NEWS_SYSTEM_PROMPT
+
+DEFAULT_OLLAMA_HOST = "http://localhost:11434"
+DEFAULT_OLLAMA_MODEL = "qwen3:8b"
+
+
+class LLMBackend(Protocol):
+    def extract_topics(self, raw_item: RawItem) -> list[TopicExtraction]: ...
+
+
+class AnthropicBackend:
+    def __init__(self, client: anthropic.Anthropic, model: str = DEFAULT_MODEL):
+        self.client = client
+        self.model = model
+
+    def extract_topics(self, raw_item: RawItem) -> list[TopicExtraction]:
+        return extract_news(self.client, raw_item, model=self.model)
+
+
+class OllamaBackend:
+    def __init__(
+        self,
+        model: str = DEFAULT_OLLAMA_MODEL,
+        host: str = DEFAULT_OLLAMA_HOST,
+        client: httpx.Client | None = None,
+        think: bool | None = False,
+    ):
+        self.model = model
+        self.host = host.rstrip("/")
+        self.client = client or httpx.Client(timeout=600.0)
+        # Reasoning models burn minutes on thinking traces at local token
+        # speeds before emitting the constrained JSON — off by default.
+        # None omits the flag for models that reject it.
+        self.think = think
+
+    def extract_topics(self, raw_item: RawItem) -> list[TopicExtraction]:
+        payload: dict = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": NEWS_SYSTEM_PROMPT},
+                {"role": "user", "content": format_news_user_prompt(raw_item)},
+            ],
+            "stream": False,
+            "format": NEWS_EXTRACTION_TOOL["input_schema"],
+            # 16k context: news articles run 500-3,000 words plus prompt
+            "options": {"temperature": 0, "num_ctx": 16384},
+        }
+        if self.think is not None:
+            payload["think"] = self.think
+        response = self.client.post(f"{self.host}/api/chat", json=payload)
+        response.raise_for_status()
+        content = response.json().get("message", {}).get("content", "")
+        try:
+            payload = json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise ExtractionError(f"Ollama returned non-JSON content: {content[:200]!r}") from exc
+        topics = payload.get("topics")
+        if not isinstance(topics, list):
+            raise ExtractionError(f"Ollama response missing 'topics' list: {payload!r}")
+        return [TopicExtraction.model_validate(topic) for topic in topics]
+
+
+def as_backend(llm: object, model: str = DEFAULT_MODEL) -> LLMBackend:
+    """Accept a backend or a bare Anthropic client (legacy call sites)."""
+    if hasattr(llm, "extract_topics"):
+        return llm  # type: ignore[return-value]
+    return AnthropicBackend(llm, model)  # type: ignore[arg-type]

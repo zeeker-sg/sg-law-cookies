@@ -213,7 +213,7 @@ trivial because the hard work is done upstream.
 | Data source | data.zeeker.sg (Datasette JSON API / MCP) | A catalogue that indexes and points at sources, not a republisher. Self-describing, so new databases are auto-discoverable. Underlying source licences vary per database — captured at ingest. One client replaces all per-source scrapers. This project is the showcase consumer. |
 | Language | Python, end-to-end | Single codebase for pipeline, site generation, and distribution. |
 | Package management | uv | Fast, modern, already in use in current repo. |
-| LLM | Anthropic API with tool use / structured outputs | Forces JSON schema conformance. Eliminates malformed output. |
+| LLM | Anthropic API with tool use (primary); Ollama structured outputs (local alternative) | Both enforce the same JSON schema, so backends are interchangeable. Ollama (e.g. gemma4:26b) enables free local/dev runs — disable thinking traces, which are prohibitively slow at local token speeds. |
 | Orchestration | Plain Python, no framework (no Rivet) | Full control, easy to version and test, no stale dependency risk. |
 | Database | SQLite + sqlite-vec | No database server. Full query capability. Embedding search for dedup. |
 | Ontology | FOLIO (openlegalstandard.org) | 18,000+ standardised concepts. CC-BY licensed. Python library and public API. MCP server available. |
