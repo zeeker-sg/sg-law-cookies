@@ -166,8 +166,8 @@ def build_parser() -> argparse.ArgumentParser:
     build_p.add_argument("--out", default="./dist", help="output directory (default ./dist)")
     build_p.add_argument(
         "--base-url",
-        default=os.environ.get("COOKIES_BASE_URL", "https://example.org"),
-        help="canonical site base URL (default $COOKIES_BASE_URL or https://example.org)",
+        default=os.environ.get("COOKIES_BASE_URL", "https://cookies.zeeker.sg"),
+        help="canonical site base URL (default $COOKIES_BASE_URL or https://cookies.zeeker.sg)",
     )
     build_p.set_defaults(func=_cmd_build)
 
