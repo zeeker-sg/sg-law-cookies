@@ -174,6 +174,21 @@ def _cmd_build(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _cmd_backup(args: argparse.Namespace, settings: Settings) -> int:
+    from sg_law_cookies.backup import BackupError, backup_db
+
+    try:
+        result = backup_db(settings.db_path)
+    except BackupError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(
+        f"backed up {settings.db_path} ({result.size_bytes:,} bytes) -> "
+        f"s3://{result.bucket}/{result.dated_key} (+ latest.db)"
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cookies", description="SG Law Cookies pipeline")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -226,6 +241,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="canonical site base URL (default $COOKIES_BASE_URL or https://cookies.zeeker.sg)",
     )
     build_p.set_defaults(func=_cmd_build)
+
+    backup_p = sub.add_parser(
+        "backup", help="snapshot the database and upload to S3 (env: S3_BUCKET, AWS keys)"
+    )
+    backup_p.set_defaults(func=_cmd_backup)
 
     return parser
 

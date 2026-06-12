@@ -12,6 +12,25 @@ from sg_law_cookies.llm import DEFAULT_OLLAMA_HOST, DEFAULT_OLLAMA_MODEL
 DEFAULT_DB_PATH = "./cookies.db"
 
 
+def load_dotenv(path: str | Path = ".env") -> None:
+    """Load KEY=VALUE lines into os.environ (existing vars win).
+
+    Mirrors the Zeeker convention: S3/API credentials live in a local
+    .env, never in code or version control.
+    """
+    p = Path(path)
+    if not p.is_file():
+        return
+    for line in p.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip().strip("'\"")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
 @dataclass(frozen=True)
 class Settings:
     db_path: Path
@@ -25,6 +44,7 @@ class Settings:
 
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     if env is None:
+        load_dotenv()
         env = os.environ
     return Settings(
         db_path=Path(env.get("COOKIES_DB_PATH", DEFAULT_DB_PATH)),
