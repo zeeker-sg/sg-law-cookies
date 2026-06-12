@@ -89,12 +89,13 @@
       </div>
     </div>
     <p class="case-note">The <b>chips</b> on each cookie are its FOLIO concepts — more chips, more doctrine.
-    Pineapple tarts are reserved for the signals you act on.{% if rack and rack.count %} {{ rack.count }} more bake{{ 's are' if rack.count != 1 else ' is' }} on the cooling rack below.{% endif %}</p>
+    <a class="kuih" href="https://en.wikipedia.org/wiki/Pineapple_tart" target="_blank" rel="noopener">Pineapple tarts</a> are reserved for the signals you act on.{% if rack and rack.count %} {{ rack.count }} more bake{{ 's are' if rack.count != 1 else ' is' }} on the cooling rack below.{% endif %}</p>
     {% elif totals.total == 0 %}
     <p class="case-note">The oven's warming up — no cookies logged yet. Come back after the morning bake.</p>
     {% else %}
     <p class="case-note">The display case is empty — the oven rested {{ 'today' if is_today else 'that day' }}. Come again tomorrow.</p>
     {% endif %}
+    <p class="case-note counter-map-link"><a href="/counter-map/">see how the day spread across the counter →</a></p>
   </section>
 
   {% if specials %}

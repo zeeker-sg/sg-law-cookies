@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SG Law Cookies — the counter map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<style>
+  :root {
+    --ink: #14201F; --night: #0E1B1A; --night-2: #1A2C2A;
+    --cream: #F5F2EA; --ink-dim: #3E4F4E; --ink-faint: #6E7A79; --line: #D9D3C4; --line-strong: #B5AD99;
+    --dough: #E9C887; --dough-deep: #D4A356; --dough-toast: #C68B43;
+    --terracotta: #B5552F; --terracotta-hot: #D96A3C; --ochre: #C08A2E;
+    --accent-soft: #C4D8D9; --chip: #4A2E15;
+    --mono: 'JetBrains Mono', monospace; --serif: 'Equity OT B', Georgia, serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background: var(--cream); color: var(--ink); font-family: var(--serif); min-height:100vh; overflow-x:hidden; }
+  body::after { content:""; position:fixed; inset:0; pointer-events:none; opacity:.6; mix-blend-mode:multiply;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"); }
+  .frame { max-width: 1100px; margin: 0 auto; padding: 22px 26px 50px; position:relative; z-index:1; }
+  header { display:flex; justify-content:space-between; align-items:center; padding-bottom: 14px; border-bottom: 2px solid var(--ink); }
+  .brand { display:flex; align-items:center; gap:11px; font-weight:700; font-size:18px; }
+  .brand .crumb { width:26px; height:26px; border-radius:50% 46% 52% 48% / 48% 52% 46% 52%;
+    background: radial-gradient(circle at 35% 30%, var(--dough), var(--dough-deep) 80%); border:1px solid var(--dough-toast); position:relative; }
+  .brand .crumb::before { content:""; position:absolute; width:4px; height:4px; border-radius:50%; background:var(--chip); top:7px; left:9px; box-shadow: 6px 7px 0 -0.5px var(--chip); }
+  .brand i { font-style:italic; color: var(--terracotta-hot); }
+  header a { font-family:var(--mono); font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-dim); text-decoration:none; }
+  header a:hover { color: var(--terracotta); }
+
+  .skyhead { text-align:center; padding: 26px 0 4px; }
+  .skyhead .kick { font-family:var(--mono); font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--terracotta); }
+  .skyhead h1 { font-size: clamp(28px, 4.4vw, 44px); font-weight:700; letter-spacing:-.015em; margin:6px 0 4px; }
+  .skyhead h1 em { font-style:italic; color: var(--terracotta); }
+  .skyhead .sub { font-style:italic; color:var(--ink-dim); font-size:15px; }
+  #stats { font-family:var(--mono); font-size:12px; letter-spacing:.08em; color:var(--ink-dim); text-align:center; padding-top:10px; }
+  #stats b { color:var(--ink); } #stats .hot { color: var(--terracotta); }
+
+  #sky { display:block; width:100%; height:auto; }
+  .lbl { font-family:var(--mono); font-size:10.5px; fill:var(--ink-dim); letter-spacing:.08em; text-transform:uppercase; pointer-events:none; }
+  .cnt { font-family:var(--serif); font-weight:700; fill:var(--chip); pointer-events:none; }
+
+  .scrub { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; padding: 6px 0 16px; }
+  .day {
+    font-family:var(--mono); font-size:11px; letter-spacing:.06em; cursor:pointer;
+    background: linear-gradient(180deg, #FAEA92, #F7E27D); color: var(--ink);
+    border:1px solid #D9B43B; border-radius:2px; padding: 6px 10px 5px;
+    opacity:.45; transform: rotate(-1deg); transition: all .15s ease;
+  }
+  .day:nth-child(even) { transform: rotate(1.2deg); }
+  .day b { display:block; font-size:13px; }
+  .day:hover { opacity:.8; }
+  .day.active { opacity:1; transform: rotate(0) translateY(-2px); box-shadow: 0 6px 14px -6px rgba(20,32,31,.4); }
+  .legend { text-align:center; font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); padding-top:6px; }
+  .legend .t { color: var(--terracotta); }
+  a.kuih { color: inherit; text-decoration: underline dotted var(--terracotta); text-underline-offset: 3px; }
+  a.kuih:hover { color: var(--terracotta); }
+  #tip { position:fixed; pointer-events:none; background:var(--cream); color:var(--ink); border-radius:3px;
+    padding:10px 13px; font-size:13px; max-width:300px; opacity:0; transition:opacity .12s; z-index:10;
+    box-shadow: 0 14px 30px -12px rgba(20,32,31,.35); border:1px solid var(--line); }
+  #tip .a { font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--terracotta); display:block; margin-bottom:5px; }
+  #tip li { margin-left:14px; line-height:1.45; margin-bottom:3px; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header>
+    <div class="brand"><span class="crumb"></span>SG Law Cookies<i>.</i></div>
+    <a href="/">← back to the counter</a>
+  </header>
+  <div class="skyhead">
+    <p class="kick">The counter map</p>
+    <h1>The spread on <em id="dayname">the day</em></h1>
+    <p class="sub">every area of law, pressed as <a class="kuih" href="https://en.wikipedia.org/wiki/Kue_bangkit" target="_blank" rel="noopener">kuih bangkit</a> and sized by the day's bake — a red dot where it's still warm</p>
+    <p id="stats"></p>
+  </div>
+  <svg id="sky" viewBox="0 0 1000 560">
+    <defs>
+      <radialGradient id="dough" cx="36%" cy="30%"><stop offset="30%" stop-color="#E9C887"/><stop offset="100%" stop-color="#D4A356"/></radialGradient>
+      <radialGradient id="bangkit" cx="42%" cy="36%"><stop offset="25%" stop-color="#FEFCF5"/><stop offset="78%" stop-color="#F8F2DF"/><stop offset="100%" stop-color="#EDE3C8"/></radialGradient>
+      <radialGradient id="tart" cx="42%" cy="34%"><stop offset="35%" stop-color="#F2B348"/><stop offset="100%" stop-color="#D98A12"/></radialGradient>
+      <filter id="soft" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#14201F" flood-opacity="0.25"/></filter>
+    </defs>
+  </svg>
+  <div class="scrub" id="scrub"></div>
+  <p class="legend"><a class="kuih" href="https://en.wikipedia.org/wiki/Kue_bangkit" target="_blank" rel="noopener">kuih bangkit</a> = area of law · size = the day's bake · <span class="t">red dot</span> = still warm · <span style="color:var(--ochre)">ochre threads</span> = shared doctrine this week</p>
+</div>
+<div id="tip"></div>
+<script>
+const DAYS = [{"date": "2026-05-26", "totals": {"total": 2, "news": 0, "judgments": 2, "high": 1}, "areas": [{"label": "Personal and Family Law", "count": 1, "high": 0, "cookies": [{"h": "SGPHC holds in Johan Daniel Blomberg v Khan Zhi Yan [2026] SGPHC 2 that broad undertakings", "sig": "medium", "kind": "judgment"}]}, {"label": "Criminal Law", "count": 1, "high": 1, "cookies": [{"h": "SGPHC in Johan Daniel Blomberg v Khan Zhi Yan [2026] SGPHC 2 applies the s 21 AJPA defence", "sig": "high", "kind": "judgment"}]}], "ties": []}, {"date": "2026-05-29", "totals": {"total": 6, "news": 0, "judgments": 6, "high": 0}, "areas": [{"label": "Public and Administrative Law", "count": 2, "high": 0, "cookies": [{"h": "High Court in Paulus Tannos @ Tjhin Thian Po v AG [2026] SGHC 118 clarifies that the limit", "sig": "medium", "kind": "judgment"}, {"h": "High Court in Paulus Tannos @ Tjhin Thian Po v AG [2026] SGHC 118 holds that the Minister ", "sig": "medium", "kind": "judgment"}]}, {"label": "General", "count": 2, "high": 0, "cookies": [{"h": "High Court in Paulus Tannos @ Tjhin Thian Po v AG [2026] SGHC 118 applies a three-step app", "sig": "low", "kind": "judgment"}, {"h": "High Court in Client v Solicitors [2026] SGHC 119 holds that pending arbitration and ambig", "sig": "medium", "kind": "judgment"}]}, {"label": "Fraud and Economic Torts Law", "count": 1, "high": 0, "cookies": [{"h": "High Court in Client v Solicitors [2026] SGHC 119 rules that allegations of fraudulent inf", "sig": "medium", "kind": "judgment"}]}, {"label": "Personal and Family Law", "count": 1, "high": 0, "cookies": [{"h": "SGFC holds in [2026] SGFC 81 that a variation application under s 72 of the Women\u2019s Charte", "sig": "medium", "kind": "judgment"}]}], "ties": [{"a": "Fraud and Economic Torts Law", "b": "General", "w": 2}, {"a": "General", "b": "Personal and Family Law", "w": 2}]}, {"date": "2026-06-02", "totals": {"total": 5, "news": 0, "judgments": 5, "high": 0}, "areas": [{"label": "General", "count": 2, "high": 0, "cookies": [{"h": "SGHCI in DTH v DTI [2026] SGHC(I) 5 clarifies that Rule 37 of the SIAC Rules is substantiv", "sig": "medium", "kind": "judgment"}, {"h": "High Court in Chong Jorina v Ritz Property Investimentos Imobiliarios Ltda [2020] SGHC 120", "sig": "low", "kind": "judgment"}]}, {"label": "Personal Injury and Tort Law", "count": 2, "high": 0, "cookies": [{"h": "High Court in Chong Jorina v Ritz Property Investimentos Imobiliarios Ltda [2026] SGHC 120", "sig": "medium", "kind": "judgment"}, {"h": "High Court in Chong Jorina v Ritz Property Investimentos Imobiliarios Ltda [2026] SGHC 120", "sig": "low", "kind": "judgment"}]}, {"label": "Public Policy and Government Affairs Law", "count": 1, "high": 0, "cookies": [{"h": "SGHCI holds in DTH v DTI [2026] SGHC(I) 5 that the recoverability of third-party funding (", "sig": "medium", "kind": "judgment"}]}], "ties": []}, {"date": "2026-06-03", "totals": {"total": 8, "news": 0, "judgments": 8, "high": 2}, "areas": [{"label": "Personal and Family Law", "count": 5, "high": 1, "cookies": [{"h": "SGHCF in [2026] SGHCF 16 holds that the structured approach in ANJ v ANK remains the defau", "sig": "high", "kind": "judgment"}, {"h": "SGHCF in [2026] SGHCF 16 clarifies that for assets acquired before marriage but partially ", "sig": "medium", "kind": "judgment"}, {"h": "SGHCF in [2026] SGHCF 16 rules that the interest element of a policy loan should be exclud", "sig": "low", "kind": "judgment"}, {"h": "SGHCF in [2026] SGHCF 16 applies the presumption of advancement to determine beneficial in", "sig": "low", "kind": "judgment"}, {"h": "SGHCF in [2026] SGHCF 16 orders short-term extension of spousal maintenance to allow for f", "sig": "low", "kind": "judgment"}]}, {"label": "General", "count": 2, "high": 1, "cookies": [{"h": "SGDC departs from the rule that a defendant bears costs for setting aside a default judgme", "sig": "high", "kind": "judgment"}, {"h": "SGMC held in Cairnhill Law LLC v Ms Subramanian Deepa [2026] SGMC 67 that failure to atten", "sig": "medium", "kind": "judgment"}]}, {"label": "Contract Law", "count": 1, "high": 0, "cookies": [{"h": "SGDC allows application to set aside default judgment in Shariffah Zaiton Binte Syed Agil ", "sig": "medium", "kind": "judgment"}]}], "ties": [{"a": "Contract Law", "b": "Personal and Family Law", "w": 2}, {"a": "Contract Law", "b": "General", "w": 1}, {"a": "General", "b": "Personal and Family Law", "w": 2}]}, {"date": "2026-06-04", "totals": {"total": 6, "news": 0, "judgments": 6, "high": 2}, "areas": [{"label": "General", "count": 2, "high": 1, "cookies": [{"h": "SGHCF holds in A v R [2026] SGHCF 18 that allegations of prior financial misuse are releva", "sig": "medium", "kind": "judgment"}, {"h": "SGHCF in A v R [2026] SGHCF 18 clarifies that s 17(3)(b)(ii) of the MCA 2008 does not perm", "sig": "high", "kind": "judgment"}]}, {"label": "Personal and Family Law", "count": 2, "high": 0, "cookies": [{"h": "SGHCF holds in [2026] SGHCF 17 that a repayment clause in a consent order can be recorded ", "sig": "medium", "kind": "judgment"}, {"h": "SGHCF in [2026] SGHCF 17 reaffirms the high threshold for setting aside a consent order ba", "sig": "low", "kind": "judgment"}]}, {"label": "Criminal Law", "count": 2, "high": 1, "cookies": [{"h": "High Court in [2026] SGHC 121 clarifies the two-stage inquiry for the \u201cought reasonably to", "sig": "high", "kind": "judgment"}, {"h": "High Court in [2026] SGHC 121 holds that Police Advisory 14 serves as a 'red flag' suffici", "sig": "medium", "kind": "judgment"}]}], "ties": [{"a": "General", "b": "Personal and Family Law", "w": 2}]}, {"date": "2026-06-05", "totals": {"total": 7, "news": 3, "judgments": 4, "high": 1}, "areas": [{"label": "General", "count": 3, "high": 0, "cookies": [{"h": "Singapore and Malaysia establish bilateral cooperation framework for alternative dispute r", "sig": "medium", "kind": "news"}, {"h": "Institutional partnerships established between SIAC, SIMC, and AIAC.", "sig": "low", "kind": "news"}, {"h": "SGHCA in Deepak Mishra v Rashmi Bothra [2026] SGHC(A) 17 declines to order a retrial where", "sig": "medium", "kind": "judgment"}]}, {"label": "Contract Law", "count": 3, "high": 1, "cookies": [{"h": "High Court holds in Deepak Mishra v Rashmi Bothra [2026] SGHC(A) 17 that the presence of c", "sig": "high", "kind": "judgment"}, {"h": "SGSCT held in JHL v JHM [2026] SGSCT 16 that landlords cannot claim for repairs or cleanin", "sig": "medium", "kind": "judgment"}, {"h": "SGSCT in JHL v JHM [2026] SGSCT 16 rejected a landlord's claim for early occupation charge", "sig": "low", "kind": "judgment"}]}, {"label": "Criminal Law", "count": 1, "high": 0, "cookies": [{"h": "Court grants acquittal for youth with mental health conditions following prosecution's app", "sig": "medium", "kind": "news"}]}], "ties": [{"a": "Contract Law", "b": "General", "w": 1}]}, {"date": "2026-06-08", "totals": {"total": 11, "news": 8, "judgments": 3, "high": 1}, "areas": [{"label": "Personal and Family Law", "count": 4, "high": 0, "cookies": [{"h": "High Court applies 'commingling' principle to include pre-marital assets in matrimonial po", "sig": "medium", "kind": "news"}, {"h": "Court identifies beneficial ownership of property held in a child's name based on control ", "sig": "medium", "kind": "news"}, {"h": "High Court determines spousal maintenance based on a comparison of reasonable monthly expe", "sig": "low", "kind": "news"}, {"h": "Court adjusts asset division ratio to account for the substantial presence of pre-marital ", "sig": "low", "kind": "news"}]}, {"label": "Criminal Law", "count": 3, "high": 1, "cookies": [{"h": "Extradition of antitrust defendants from Singapore to the US depends on the principle of d", "sig": "low", "kind": "news"}, {"h": "Authorities issue disabling directions under the Online Criminal Harms Act to block inflam", "sig": "high", "kind": "news"}, {"h": "Authorities identify potential offences under Section 298A of the Penal Code regarding inf", "sig": "medium", "kind": "news"}]}, {"label": "General", "count": 2, "high": 0, "cookies": [{"h": "SGDC in Smith v Goh Hin Calm [2026] SGDC 190 refuses to allow amendments that would introd", "sig": "medium", "kind": "judgment"}, {"h": "SGDC in Smith v Goh Hin Calm [2026] SGDC 190 holds that being a litigant in person does no", "sig": "low", "kind": "judgment"}]}, {"label": "Antitrust and Competition Law", "count": 1, "high": 0, "cookies": [{"h": "US Department of Justice indictment of container manufacturers may trigger private civil c", "sig": "medium", "kind": "news"}]}, {"label": "Defamation Law", "count": 1, "high": 0, "cookies": [{"h": "SGDC in Smith v Goh Hin Calm [2026] SGDC 190 affirms that a defamation claim must plead th", "sig": "medium", "kind": "judgment"}]}], "ties": [{"a": "General", "b": "Personal and Family Law", "w": 2}, {"a": "Defamation Law", "b": "General", "w": 1}, {"a": "Defamation Law", "b": "Personal and Family Law", "w": 1}]}];
+const svg = d3.select('#sky');
+const W = 1000, H = 560, CX = W/2, CY = H/2 - 6;
+const tip = document.getElementById('tip');
+let nodes = [], links = [], sim = null, active = DAYS.length - 1;
+
+const r = c => 16 + Math.sqrt(c) * 15;
+const petals = d => 7 + (d.label.length % 4);          // handmade mould variety
+const rosette = (R, n) => {
+  const line = d3.lineRadial().angle(p=>p[0]).radius(p=>p[1]).curve(d3.curveCatmullRomClosed);
+  return line(d3.range(0, 2*Math.PI, Math.PI/72).map(t => [t, R*(0.88 + 0.12*Math.cos(n*t))]));
+};
+
+function buildNodes(day) {
+  const prev = new Map(nodes.map(n => [n.id, n]));
+  const out = [{ id:'__centre', centre:true, fx:CX, fy:CY }];
+  day.areas.forEach((a, i) => {
+    const old = prev.get(a.label);
+    const angle = (i / day.areas.length) * 2 * Math.PI - Math.PI/2;
+    out.push({
+      id:a.label, label:a.label, count:a.count, high:a.high, cookies:a.cookies,
+      x: old ? old.x : CX + Math.cos(angle)*200,
+      y: old ? old.y : CY + Math.sin(angle)*160,
+    });
+  });
+  return out;
+}
+
+function render(idx) {
+  active = idx;
+  const day = DAYS[idx];
+  document.getElementById('dayname').textContent =
+    new Date(day.date+'T12:00:00').toLocaleDateString('en-SG',{weekday:'long', day:'numeric', month:'long'});
+  const t = day.totals;
+  document.getElementById('stats').innerHTML =
+    `<b>${t.total}</b> cookies &nbsp;·&nbsp; ${t.news} news ○ &nbsp;·&nbsp; ${t.judgments} judgments ⬡ &nbsp;·&nbsp; <span class="hot">${t.high} still warm ▲</span>`;
+  document.querySelectorAll('.day').forEach((el,i)=>el.classList.toggle('active', i===idx));
+
+  nodes = buildNodes(day);
+  links = nodes.filter(n=>!n.centre).map(n => ({source:'__centre', target:n.id, spoke:true}));
+  (day.ties||[]).forEach(t => links.push({source:t.a, target:t.b, w:t.w}));
+
+  if (sim) sim.stop();
+  sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d=>d.id)
+      .distance(d => d.spoke ? 150 + r(d.target.count||1) : 90)
+      .strength(d => d.spoke ? .18 : Math.min(.7, .22 * d.w)))
+    .force('charge', d3.forceManyBody().strength(-260))
+    .force('collide', d3.forceCollide(d => d.centre ? 50 : r(d.count) + 26))
+    .force('x', d3.forceX(CX).strength(.05)).force('y', d3.forceY(CY).strength(.07))
+    .on('tick', tick);
+
+  // edges
+  const edge = svg.selectAll('line.e').data(links, d=>(d.source.id||d.source)+'|'+(d.target.id||d.target));
+  edge.exit().remove();
+  edge.enter().append('line').attr('class','e');
+  svg.selectAll('line.e')
+    .attr('stroke', d=>d.spoke ? 'var(--line-strong)' : 'var(--ochre)')
+    .attr('stroke-dasharray', d=>d.spoke ? '2 6' : null)
+    .attr('stroke-opacity', d=>d.spoke ? .7 : .55)
+    .attr('stroke-width', d=>d.spoke ? 1 : Math.min(3.5, .9 * (d.w||1)));
+
+  // node groups
+  const g = svg.selectAll('g.n').data(nodes.filter(n=>!n.centre), d=>d.id);
+  g.exit().transition().duration(450).style('opacity',0).remove();
+  const enter = g.enter().append('g').attr('class','n').style('cursor','pointer').attr('filter','url(#soft)');
+  enter.append('circle').attr('class','halo').attr('fill','none');
+  enter.append('path').attr('class','body');
+  enter.append('circle').attr('class','dot');
+  enter.append('text').attr('class','cnt').attr('text-anchor','middle').attr('dy','.34em');
+  enter.append('text').attr('class','lbl').attr('text-anchor','middle');
+  const all = enter.merge(g);
+  all.select('path.body').transition().duration(600)
+    .attr('d', d=>rosette(r(d.count), petals(d)))
+    .attr('fill', 'url(#bangkit)')
+    .attr('stroke', d=> d.high ? 'var(--terracotta)' : 'var(--line-strong)')
+    .attr('stroke-opacity', 1)
+    .attr('stroke-width', d=> d.high ? 2 : 1.2)
+    .attr('stroke-dasharray', d=> d.high ? '1 4' : null)
+    .attr('stroke-linecap', 'round');
+  all.select('circle.dot')
+    .attr('fill', '#C2412E')
+    .attr('cy', d => -r(d.count) * 0.42)
+    .transition().duration(600)
+    .attr('r', d => d.high ? Math.max(4, r(d.count)*0.12) : 0);
+  all.select('circle.halo')
+    .attr('stroke','var(--terracotta)').attr('stroke-opacity',.45)
+    .attr('r', d=>r(d.count)+9)
+    .style('display', d=>d.high?null:'none');
+  all.select('text.cnt').text(d=>d.count).attr('font-size', d=> 13 + Math.sqrt(d.count)*2).attr('fill','var(--chip)');
+  all.select('text.lbl').text(d=>d.label.replace(' and ',' & ').replace(' Law',''))
+    .attr('dy', d=>r(d.count)+16);
+  all.on('mousemove', (ev,d)=>{
+      tip.style.opacity=1; tip.style.left=(ev.clientX+16)+'px'; tip.style.top=(ev.clientY-10)+'px';
+      tip.innerHTML = `<span class="a">${d.label} · ${d.count} cookie${d.count>1?'s':''}</span><ul>` +
+        d.cookies.slice(0,4).map(c=>`<li>${c.sig==='high'?'▲ ':''}${c.kind==='judgment'?'⬡ ':'○ '}${c.h}…</li>`).join('') +
+        (d.cookies.length>4?`<li>+${d.cookies.length-4} more</li>`:'') + '</ul>';
+    }).on('mouseleave', ()=>{ tip.style.opacity=0; });
+
+  // centre date node
+  const c = svg.selectAll('g.c').data([day.date]);
+  const cEnter = c.enter().append('g').attr('class','c').attr('transform',`translate(${CX},${CY})`);
+  cEnter.append('rect').attr('x',-34).attr('y',-26).attr('width',68).attr('height',52).attr('rx',2)
+    .attr('fill','#F7E27D').attr('stroke','#D9B43B').attr('transform','rotate(-2)');
+  cEnter.append('text').attr('class','lbl').attr('text-anchor','middle').attr('dy','-3');
+  cEnter.append('text').attr('class','cnt').attr('text-anchor','middle').attr('dy','15').attr('font-size','17');
+  svg.select('g.c .lbl').attr('fill','var(--terracotta)').text(day.date.slice(5,7)==='06'?'JUN':'MAY');
+  svg.select('g.c .cnt').text(+day.date.slice(8));
+
+  // pulse animation on halos
+  svg.selectAll('circle.halo')
+    .transition().duration(1600).ease(d3.easeSinInOut).attr('stroke-opacity',.12)
+    .transition().duration(1600).ease(d3.easeSinInOut).attr('stroke-opacity',.45)
+    .on('end', function repeat(){
+      d3.select(this)
+        .transition().duration(1600).ease(d3.easeSinInOut).attr('stroke-opacity',.12)
+        .transition().duration(1600).ease(d3.easeSinInOut).attr('stroke-opacity',.45)
+        .on('end', repeat);
+    });
+}
+
+function tick() {
+  svg.selectAll('line.e')
+    .attr('x1',d=>d.source.x).attr('y1',d=>d.source.y)
+    .attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
+  svg.selectAll('g.n').attr('transform', d=>`translate(${d.x},${d.y})`);
+}
+
+const scrub = document.getElementById('scrub');
+DAYS.forEach((d,i)=>{
+  const b = document.createElement('button'); b.className='day';
+  const dt = new Date(d.date+'T12:00:00');
+  b.innerHTML = `${dt.toLocaleDateString('en-SG',{month:'short'}).toUpperCase()}<b>${dt.getDate()}</b>`;
+  b.onclick = ()=>render(i);
+  scrub.appendChild(b);
+});
+render(active);
+</script>
+</body>
+</html>

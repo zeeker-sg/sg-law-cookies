@@ -154,8 +154,8 @@ def test_build_writes_expected_files(built):
     ):
         assert (out / rel).exists(), rel
     assert report.dates == ["2026-06-11", "2026-06-10"]
-    # 2 daily pages + homepage + archive + about + feed
-    assert report.pages == 6
+    # 2 daily pages + homepage + archive + about + feed + counter map
+    assert report.pages == 7
 
 
 def test_index_attribution_disclaimer_and_source_links(built):
@@ -271,5 +271,5 @@ def test_cli_build_prints_page_count(populated, tmp_path, monkeypatch, capsys):
     rc = cli.main(["build", "--out", str(out), "--base-url", BASE_URL])
     assert rc == 0
     captured = capsys.readouterr()
-    assert "built 6 pages" in captured.out
+    assert "built 7 pages" in captured.out
     assert (out / "index.html").exists()

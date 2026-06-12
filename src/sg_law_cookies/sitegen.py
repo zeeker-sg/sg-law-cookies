@@ -6,6 +6,7 @@ ORIGINAL source_url (never a Zeeker URL) and every page carries the
 data.zeeker.sg attribution + disclaimer via base.html.j2 (PRD §2.5, §6.1).
 """
 
+import json
 import re
 import shutil
 import sqlite3
@@ -16,7 +17,7 @@ from urllib.parse import urlsplit
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from sg_law_cookies import db
+from sg_law_cookies import db, skydata
 from sg_law_cookies.feed import build_feed, render_feed
 from sg_law_cookies.models import Cookie, Source
 
@@ -288,6 +289,7 @@ def build_site(conn: sqlite3.Connection, out_dir: Path, base_url: str) -> BuildR
     daily_tpl = env.get_template("daily.html.j2")
     about_tpl = env.get_template("about.html.j2")
     archive_tpl = env.get_template("archive.html.j2")
+    counter_map_tpl = env.get_template("counter_map.html.j2")
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -342,7 +344,24 @@ def build_site(conn: sqlite3.Connection, out_dir: Path, base_url: str) -> BuildR
     _write(out_dir / "feed.xml", render_feed(build_feed(conn, base_url)))
     report.pages += 1
 
+    # counter map (PRD §7): page + per-day sky JSON the page fetches
+    _write(out_dir / "counter-map" / "index.html", counter_map_tpl.render())
+    report.pages += 1
+    _write(
+        out_dir / "data" / "sky" / "index.json",
+        json.dumps(skydata.build_sky_index(conn), ensure_ascii=False),
+    )
+    for day_iso in day_isos:
+        _write(
+            out_dir / "data" / "sky" / f"{day_iso}.json",
+            json.dumps(
+                skydata.build_sky_day(conn, date.fromisoformat(day_iso)),
+                ensure_ascii=False,
+            ),
+        )
+
     (out_dir / "static").mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(_STATIC_DIR / "site.css", out_dir / "static" / "site.css")
+    for asset in ("site.css", "sky.css", "d3.v7.min.js"):
+        shutil.copyfile(_STATIC_DIR / asset, out_dir / "static" / asset)
 
     return report

@@ -282,6 +282,10 @@ nav.site-nav a.zk:hover { background: var(--color-accent); color: var(--color-te
 .bake.cool .pricecard .pr { color: var(--color-text-muted); }
 .case-note { margin-top: 12px; font-size: 13px; color: var(--color-text-muted); font-style: italic; }
 .case-note b { color: var(--chip); font-style: normal; }
+a.kuih { color: inherit; text-decoration: underline dotted var(--color-terracotta); text-underline-offset: 3px; }
+a.kuih:hover { color: var(--color-terracotta); }
+.counter-map-link a { color: inherit; text-decoration: underline dotted var(--color-terracotta); text-underline-offset: 3px; }
+.counter-map-link a:hover { color: var(--color-terracotta); }
 
 /* ── specials board / menu / rack (kept from v2) ─── */
 .board {
