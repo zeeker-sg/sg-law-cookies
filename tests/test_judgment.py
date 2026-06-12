@@ -562,3 +562,31 @@ def test_issues_capped_at_eight_with_warning(conn):
     assert len(meta.issues) == 10  # all issues kept in meta
     assert meta.issues[0].holding == "Decided."
     assert meta.issues[9].holding == ""  # beyond the cap: question only
+
+
+@respx.mock
+def test_catalogue_citation_and_court_override_llm(conn):
+    # Regression: model stored case number "OC 1154/2025" while Zeeker's
+    # extras carried the authoritative "[2026] SGDC 136"; bare "District
+    # Court" resolved to a US court via FOLIO substring match.
+    mock_folio()
+    fake = FakeBackend(
+        {
+            "record_judgment": SHORT_STRUCTURE,
+            "record_topics": {"topics": [topic_dict()]},
+        }
+    )
+    item = make_item(
+        numbered_text(20, para_chars=200),
+        extras={"citation": "[2026] SGDC 136", "court": "District Court"},
+    )
+
+    with httpx.Client() as folio_client:
+        process_judgment(item, conn, fake, folio_client)
+
+    source = db.find_source_by_url(conn, item.source_url)
+    meta = db.get_judgment_meta(conn, source.id)
+    assert meta.citation == "[2026] SGDC 136"  # not SHORT_STRUCTURE's citation
+    assert meta.court is not None
+    assert meta.court.preferred_label == "State Courts"
+    assert meta.court.branch == "sg_local"

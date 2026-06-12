@@ -33,13 +33,32 @@ _register("Attorney-General's Chambers", "AGC")
 _register("Intellectual Property Office of Singapore", "IPOS")
 _register("Monetary Authority of Singapore", "MAS")
 _register("Singapore Exchange", "SGX", "Singapore Exchange Limited")
-_register("State Courts", "State Courts of Singapore", "State Courts of the Republic of Singapore")
+# Bare "District Court" etc. are safe here: every judgment in this system
+# is Singaporean, and FOLIO substring-matches these generic names to US
+# courts (e.g. "U.S. District Court - D. Oregon") at 0.8 confidence.
+_register(
+    "State Courts",
+    "State Courts of Singapore",
+    "State Courts of the Republic of Singapore",
+    "District Court",
+    "District Court of Singapore",
+    "SGDC",
+    "Magistrate's Court",
+    "Magistrates' Court",
+    "SGMC",
+)
 _register(
     "Singapore International Commercial Court",
     "SICC",
     "Singapore International Commercial Court of the Republic of Singapore",
 )
-_register("Family Justice Courts", "FJC", "Family Justice Courts of the Republic of Singapore")
+_register(
+    "Family Justice Courts",
+    "FJC",
+    "Family Justice Courts of the Republic of Singapore",
+    "Family Court",
+    "SGFC",
+)
 _register("Supreme Court of Singapore")
 _register(
     "Court of Appeal of Singapore",

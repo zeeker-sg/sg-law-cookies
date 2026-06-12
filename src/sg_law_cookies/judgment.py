@@ -490,6 +490,14 @@ def process_judgment(
             )
         structure = merge_structures(partials)
 
+    # Catalogue fields beat LLM extraction where Zeeker provides them:
+    # the smoke test stored "OC 1154/2025" (a case number the model chose)
+    # while extras carried the authoritative "[2026] SGDC 136".
+    if raw_item.extras.get("citation", "").strip():
+        structure.citation = raw_item.extras["citation"].strip()
+    if raw_item.extras.get("court", "").strip():
+        structure.court_name = raw_item.extras["court"].strip()
+
     # ── Step 3: issue-level summarisation (medium/long) ──────────────
     if path != "short":
         if len(structure.issues) > MAX_ISSUES_SUMMARISED:

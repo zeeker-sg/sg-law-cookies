@@ -260,3 +260,15 @@ def test_live_resolve_court_of_appeal():
     assert ref.preferred_label == "Court of Appeal of Singapore"
     assert ref.branch == "sg_local"
     assert ref.confidence == 1.0
+
+
+def test_generic_sg_court_names_resolve_locally_not_to_us_courts():
+    # Regression: live smoke test resolved "District Court" to
+    # "U.S. District Court - D. Oregon" via FOLIO substring match.
+    import httpx
+    from sg_law_cookies.folio import resolve_venue
+
+    for name in ["District Court", "Magistrate's Court", "Family Court", "SGDC"]:
+        ref = resolve_venue(httpx.Client(), name)  # no API call: local table hit
+        assert ref.branch == "sg_local", name
+        assert ref.confidence == 1.0, name
