@@ -51,6 +51,8 @@ _register(
     "Singapore International Commercial Court",
     "SICC",
     "Singapore International Commercial Court of the Republic of Singapore",
+    "SGHC(I)",
+    "SGHCI",
 )
 _register(
     "Family Justice Courts",
@@ -79,7 +81,18 @@ _register(
     "Appellate Division of the High Court",
     "Appellate Division of the High Court of Singapore",
     "Appellate Division of the High Court of the Republic of Singapore",
+    # Zeeker's court column uses bare citation-style abbreviations.
     "SGHC(A)",
+    "SGHCA",
+    "High Court (Family Division)",
+    "Family Division of the High Court",
+    "SGHCF",
+)
+_register("Small Claims Tribunals", "Small Claims Tribunal", "SGSCT", "SCT")
+_register(
+    "Protection from Harassment Court",
+    "SGPHC",
+    "Protection from Harassment Courts",
 )
 _register("Competition and Consumer Commission of Singapore", "CCCS")
 _register("Infocomm Media Development Authority", "IMDA")
