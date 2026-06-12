@@ -17,12 +17,17 @@ JUDGMENT_TABLES = {"judgments", "enforcement_decisions"}
 
 # Watermark column per (database, table). Most Zeeker tables use
 # created_at; sglawwatch and pdpc use imported_on (verified live).
+# zeeker-judgements/judgments has no imported_on column and sorts by
+# created_at without error (verified live 2026-06-12).
 TIMESTAMP_COLUMNS: dict[tuple[str, str], str] = {
     ("sglawwatch", "headlines"): "imported_on",
     ("sglawwatch", "commentaries"): "imported_on",
     ("pdpc", "enforcement_decisions"): "imported_on",
 }
 DEFAULT_TIMESTAMP_COLUMN = "created_at"
+
+# Max characters of court_summary carried in RawItem.extras.
+COURT_SUMMARY_EXTRA_LIMIT = 2000
 
 # Non-content utility tables that survive the prefix/suffix filters.
 _EXCLUDED_TABLES = {"schema_versions", "metadata"}
@@ -62,14 +67,43 @@ def _parse_date(value: Any) -> date | None:
         return None
 
 
-def _row_fields(table: str, row: dict[str, Any]) -> tuple[str, str, str, Any]:
-    """Return (source_url, title, raw_text, raw_document_date) for a row."""
+def _set_extra(extras: dict[str, str], key: str, value: Any) -> None:
+    """Record a non-empty row value in extras, coerced to str."""
+    if value is None or value == "":
+        return
+    extras[key] = str(value)
+
+
+def _judgment_text(row: dict[str, Any]) -> tuple[str, str] | None:
+    """Best available text for a zeeker-judgements row: (text, source column).
+
+    Prefers full content_text, falling back to the court-issued summary,
+    then the AI-generated summary. Returns None when the row carries no
+    usable text (e.g. has_content false-ish and no summary) — verified
+    live: rows with has_content=0 have content_text = ''.
+    """
+    for column in ("content_text", "court_summary", "summary"):
+        text = row.get(column)
+        if text:
+            return text, column
+    return None
+
+
+def _row_fields(
+    table: str, row: dict[str, Any]
+) -> tuple[str, str, str, Any, dict[str, str]] | None:
+    """Return (source_url, title, raw_text, raw_document_date, extras) for a row.
+
+    Returns None for judgment-table rows with no usable text — the
+    caller should skip those rows entirely.
+    """
     if table == "headlines":  # sglawwatch
         return (
             row["source_link"],
             row["title"],
             row.get("text") or row.get("summary") or "",
             row.get("date"),
+            {},
         )
     if table == "commentaries":  # sglawwatch
         return (
@@ -77,20 +111,42 @@ def _row_fields(table: str, row: dict[str, Any]) -> tuple[str, str, str, Any]:
             row["title"],
             row.get("full_text") or row.get("description") or "",
             row.get("pub_date"),
+            {},
         )
-    if table == "judgments":  # zeeker-judgements
+    if table == "judgments":  # zeeker-judgements (columns verified live)
+        text_and_source = _judgment_text(row)
+        if text_and_source is None:
+            return None
+        raw_text, text_source = text_and_source
+        extras: dict[str, str] = {"text_source": text_source}
+        _set_extra(extras, "citation", row.get("citation"))
+        _set_extra(extras, "court", row.get("court"))
+        _set_extra(extras, "subject_tags", row.get("subject_tags"))
+        _set_extra(extras, "pdf_url", row.get("pdf_url"))
+        court_summary = row.get("court_summary") or ""
+        _set_extra(extras, "court_summary", court_summary[:COURT_SUMMARY_EXTRA_LIMIT])
         return (
             row["source_url"],
             row.get("case_name") or row.get("citation") or "",
-            row.get("content_text") or row.get("court_summary") or row.get("summary") or "",
+            raw_text,
             row.get("decision_date"),
+            extras,
         )
-    if table == "enforcement_decisions":  # pdpc
+    if table == "enforcement_decisions":  # pdpc (columns verified live)
+        summary = row.get("summary") or ""
+        if not summary:
+            return None  # no content_text column; empty summary means no text
+        extras = {"text_source": "summary"}
+        _set_extra(extras, "organisation", row.get("organisation"))
+        _set_extra(extras, "decision_type", row.get("decision_type"))
+        _set_extra(extras, "penalty_amount", row.get("penalty_amount"))
+        _set_extra(extras, "pdf_url", row.get("pdf_url"))
         return (
             row["decision_url"],
             row["title"],
-            row.get("summary") or "",
+            summary,
             row.get("decision_date"),
+            extras,
         )
     # default: sg-gov-newsrooms *_news shape
     return (
@@ -98,6 +154,7 @@ def _row_fields(table: str, row: dict[str, Any]) -> tuple[str, str, str, Any]:
         row["title"],
         row.get("content_text") or row.get("summary") or "",
         row.get("published_date"),
+        {},
     )
 
 
@@ -209,9 +266,17 @@ class ZeekerClient:
                 break
         return rows[:limit]
 
-    def to_raw_item(self, db: str, table: str, row: dict[str, Any]) -> RawItem:
-        """Map a Zeeker row to a RawItem (source_url = original document URL)."""
-        source_url, title, raw_text, raw_date = _row_fields(table, row)
+    def to_raw_item(self, db: str, table: str, row: dict[str, Any]) -> RawItem | None:
+        """Map a Zeeker row to a RawItem (source_url = original document URL).
+
+        Returns None for judgment-table rows that carry no usable text
+        (has_content false-ish and no court/AI summary) — callers must
+        skip those rows.
+        """
+        fields = _row_fields(table, row)
+        if fields is None:
+            return None
+        source_url, title, raw_text, raw_date, extras = fields
         doc_date = _parse_date(raw_date) or _parse_date(row.get(timestamp_column(db, table)))
         if doc_date is None:
             raise ValueError(f"no usable date in {db}/{table} row {row.get('id')!r}")
@@ -230,4 +295,5 @@ class ZeekerClient:
             source_id=db,
             item_type=item_type_for(table),
             license=self.license_for(db),
+            extras=extras,
         )

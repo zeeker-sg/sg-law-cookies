@@ -59,6 +59,48 @@ def _cmd_discover(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _set_active(args: argparse.Namespace, settings: Settings, active: bool) -> int:
+    """Flip the registry active flag for one <database>/<table> source."""
+    zeeker_db, _, table = args.source.partition("/")
+    if not zeeker_db or not table:
+        print(
+            f"error: source must be '<database>/<table>', got {args.source!r}",
+            file=sys.stderr,
+        )
+        return 1
+    conn = db.init_db(settings.db_path)
+    entry = next(
+        (
+            e
+            for e in db.list_registry(conn)
+            if e.zeeker_db == zeeker_db and e.table == table
+        ),
+        None,
+    )
+    if entry is None:
+        print(
+            f"error: no registry entry for {args.source}; "
+            "run 'cookies discover' first",
+            file=sys.stderr,
+        )
+        return 1
+    db.upsert_registry_entry(conn, entry.model_copy(update={"active": active}))
+    state = "active" if active else "inactive"
+    print(
+        f"{args.source}: {state} "
+        f"(pipeline: {entry.pipeline}, license: {entry.license})"
+    )
+    return 0
+
+
+def _cmd_activate(args: argparse.Namespace, settings: Settings) -> int:
+    return _set_active(args, settings, active=True)
+
+
+def _cmd_deactivate(args: argparse.Namespace, settings: Settings) -> int:
+    return _set_active(args, settings, active=False)
+
+
 def _build_llm(settings: Settings) -> AnthropicBackend | OllamaBackend | None:
     if settings.llm_backend == "ollama":
         return OllamaBackend(model=settings.ollama_model, host=settings.ollama_host)
@@ -143,6 +185,20 @@ def build_parser() -> argparse.ArgumentParser:
         "discover", help="diff the Zeeker catalogue against the source registry"
     )
     discover_p.set_defaults(func=_cmd_discover)
+
+    activate_p = sub.add_parser(
+        "activate", help="activate a registry source for processing"
+    )
+    activate_p.add_argument(
+        "source", help="Zeeker source as <database>/<table>, e.g. zeeker-judgements/judgments"
+    )
+    activate_p.set_defaults(func=_cmd_activate)
+
+    deactivate_p = sub.add_parser(
+        "deactivate", help="deactivate a registry source (run will refuse it)"
+    )
+    deactivate_p.add_argument("source", help="Zeeker source as <database>/<table>")
+    deactivate_p.set_defaults(func=_cmd_deactivate)
 
     run_p = sub.add_parser("run", help="fetch and process new rows for one source")
     run_p.add_argument(

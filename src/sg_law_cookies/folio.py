@@ -17,7 +17,7 @@ from __future__ import annotations
 import httpx
 from pydantic import BaseModel
 
-from sg_law_cookies.models import FolioRef, TopicExtraction
+from sg_law_cookies.models import FolioRef, JudgmentMeta, TopicExtraction
 from sg_law_cookies.sg_mappings import lookup_sg_entity
 
 FOLIO_API_BASE = "https://folio.openlegalstandard.org"
@@ -228,3 +228,138 @@ def resolve_topic(topic: TopicExtraction, client: httpx.Client) -> TopicExtracti
             topic.unresolved.append(raw_concept)
 
     return topic
+
+
+# ── Judgment-specific resolution (PRD 4.2 step 5, pseudocode section 3) ──
+#
+# Branch filter values below were verified against the live API
+# (GET /openapi.json, June 2026): /search/query accepts
+# branch="forums_venues" and branch="legal_authorities".
+
+FORUMS_VENUES_BRANCH = "forums_venues"
+LEGAL_AUTHORITIES_BRANCH = "legal_authorities"
+_UNRESOLVED_BRANCH = "unresolved"
+
+
+def _unresolved_ref(label: str) -> FolioRef:
+    return FolioRef(iri=None, preferred_label=label, branch=_UNRESOLVED_BRANCH, confidence=0.0)
+
+
+def _search_branch(client: httpx.Client, query: str, branch: str) -> list[SearchResult]:
+    """Branch-filtered /search/query; cached; degrades to [] on API failure."""
+    key = (query.lower(), branch)
+    if key in _search_cache:
+        return _search_cache[key]
+    if len(query.strip()) < 2:
+        _search_cache[key] = []
+        return []
+    try:
+        resp = client.get(
+            f"{FOLIO_API_BASE}/search/query",
+            params={"label": query, "branch": branch, "limit": _SEARCH_LIMIT},
+        )
+        resp.raise_for_status()
+        classes = resp.json().get("classes", [])
+    except (httpx.HTTPError, ValueError):
+        # Degrade, never raise — the label lands in an unresolved
+        # placeholder and can be re-resolved later (PRD 4.3, 8.2).
+        return []
+    results = [
+        SearchResult(iri=cls["iri"], label=cls["label"], is_leaf=_is_leaf(cls))
+        for cls in classes
+        if cls.get("iri") and cls.get("label")
+    ]
+    _search_cache[key] = results
+    return results
+
+
+def resolve_venue(client: httpx.Client, court_name: str) -> FolioRef:
+    """Resolve a court/forum name (PRD 4.2 step 5: FOLIO forums/venues branch).
+
+    The local Singapore table is checked FIRST: probing the live API shows
+    the forums_venues branch holds no Singapore courts at all, and generic
+    names like "Court of Appeal" substring-match US courts ("Washington
+    Court of Appeals") at 0.8 — a false positive the local table prevents.
+    Non-Singapore courts still resolve via FOLIO. Always returns a FolioRef;
+    on no match or API failure it degrades to an unresolved placeholder.
+    """
+    local = lookup_sg_entity(court_name)
+    if local:
+        return local
+    best = pick_best_match(_search_branch(client, court_name, FORUMS_VENUES_BRANCH), court_name)
+    if best:
+        return FolioRef(
+            iri=best.iri,
+            preferred_label=best.label,
+            branch=FORUMS_VENUES_BRANCH,
+            confidence=best.score,
+        )
+    return _unresolved_ref(court_name)
+
+
+def resolve_legislation(client: httpx.Client, name: str) -> FolioRef:
+    """Resolve a legislation name against FOLIO legal_authorities.
+
+    Singapore statutes are mostly absent from FOLIO (expected — PRD 4.3);
+    they fall back to the local Singapore table, then to an unresolved
+    placeholder. Never raises on API failure.
+    """
+    local = lookup_sg_entity(name)
+    if local:
+        return local
+    best = pick_best_match(_search_branch(client, name, LEGAL_AUTHORITIES_BRANCH), name)
+    if best:
+        return FolioRef(
+            iri=best.iri,
+            preferred_label=best.label,
+            branch=LEGAL_AUTHORITIES_BRANCH,
+            confidence=best.score,
+        )
+    return _unresolved_ref(name)
+
+
+def _resolve_concept_label(client: httpx.Client, raw: str) -> FolioRef | None:
+    """Resolve one free-text legal concept across all branches (same logic
+    as resolve_topic pass 3). Returns None when unresolved."""
+    best = pick_best_match(_search_all_branches(client, raw), raw)
+    if not best:
+        return None
+    return FolioRef(
+        iri=best.iri,
+        preferred_label=best.label,
+        branch=_branch_for_iri(client, best.iri),
+        confidence=best.score,
+    )
+
+
+def resolve_judgment_meta(client: httpx.Client, meta: JudgmentMeta) -> JudgmentMeta:
+    """Resolve a JudgmentMeta in place: court, issue concepts, legislation.
+
+    Interface contract with the extraction step: raw free-text labels arrive
+    as placeholder refs — ``FolioRef(iri=None, preferred_label=<raw label>,
+    branch="unresolved", confidence=0.0)`` — in ``meta.court``,
+    ``issue.folio_concepts`` and ``meta.legislation``. Placeholders are
+    (re-)resolved; refs that already carry an IRI are left untouched, so the
+    function is idempotent and safe to re-run on stored metadata.
+
+    Never raises on API failure: every lookup degrades to an unresolved
+    placeholder, exactly like the news path (PRD 4.3, 8.2).
+    """
+    if meta.court is not None and meta.court.iri is None:
+        meta.court = resolve_venue(client, meta.court.preferred_label)
+
+    for issue in meta.issues:
+        resolved: list[FolioRef] = []
+        for ref in issue.folio_concepts:
+            if ref.iri is not None:
+                resolved.append(ref)
+                continue
+            hit = _resolve_concept_label(client, ref.preferred_label)
+            resolved.append(hit if hit else _unresolved_ref(ref.preferred_label))
+        issue.folio_concepts = resolved
+
+    meta.legislation = [
+        ref if ref.iri is not None else resolve_legislation(client, ref.preferred_label)
+        for ref in meta.legislation
+    ]
+    return meta

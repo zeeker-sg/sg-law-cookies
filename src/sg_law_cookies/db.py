@@ -2,13 +2,16 @@
 
 import json
 import sqlite3
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from sg_law_cookies.models import (
+    CaseCitation,
     Cookie,
     DailyStats,
     FolioRef,
+    JudgmentIssue,
+    JudgmentMeta,
     Source,
     SourceRegistryEntry,
 )
@@ -79,6 +82,20 @@ CREATE TABLE IF NOT EXISTS unresolved_terms (
     first_seen_date TEXT NOT NULL,
     count           INTEGER NOT NULL DEFAULT 1
 );
+
+CREATE TABLE IF NOT EXISTS judgment_meta (
+    source_id   TEXT PRIMARY KEY REFERENCES sources (id),
+    citation    TEXT NOT NULL,
+    court       TEXT,
+    judges      TEXT NOT NULL DEFAULT '[]',
+    parties     TEXT NOT NULL DEFAULT '[]',
+    issues      TEXT NOT NULL DEFAULT '[]',
+    legislation TEXT NOT NULL DEFAULT '[]',
+    cases_cited TEXT NOT NULL DEFAULT '[]',
+    orders      TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_judgment_meta_citation ON judgment_meta (citation);
 """
 
 
@@ -543,3 +560,92 @@ def compute_daily_stats(conn: sqlite3.Connection, day: date) -> DailyStats:
         busiest_area=busiest_area,
         unresolved_terms=unresolved,
     )
+
+
+# ── judgment metadata (PRD section 4.2) ──────────────────────────────
+
+
+def _normalise_citation(citation: str) -> str:
+    """Lowercase + collapse all whitespace runs, for exact citation matching."""
+    return " ".join(citation.split()).lower()
+
+
+def save_judgment_meta(
+    conn: sqlite3.Connection, source_id: str, meta: JudgmentMeta
+) -> None:
+    """Upsert the structured judgment metadata for a Source row."""
+    conn.execute(
+        """
+        INSERT INTO judgment_meta (source_id, citation, court, judges, parties,
+                                   issues, legislation, cases_cited, orders, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (source_id) DO UPDATE SET
+            citation = excluded.citation,
+            court = excluded.court,
+            judges = excluded.judges,
+            parties = excluded.parties,
+            issues = excluded.issues,
+            legislation = excluded.legislation,
+            cases_cited = excluded.cases_cited,
+            orders = excluded.orders
+        """,
+        (
+            source_id,
+            meta.citation,
+            json.dumps(meta.court.model_dump()) if meta.court else None,
+            json.dumps(meta.judges),
+            json.dumps(meta.parties),
+            json.dumps([issue.model_dump() for issue in meta.issues]),
+            _dump_refs(meta.legislation),
+            json.dumps([case.model_dump() for case in meta.cases_cited]),
+            meta.orders,
+            datetime.now(timezone.utc).isoformat(),
+        ),
+    )
+    conn.commit()
+
+
+def get_judgment_meta(conn: sqlite3.Connection, source_id: str) -> JudgmentMeta | None:
+    row = conn.execute(
+        "SELECT * FROM judgment_meta WHERE source_id = ?", (source_id,)
+    ).fetchone()
+    if row is None:
+        return None
+    return JudgmentMeta(
+        source_id=row["source_id"],
+        citation=row["citation"],
+        court=FolioRef.model_validate(json.loads(row["court"])) if row["court"] else None,
+        judges=json.loads(row["judges"]),
+        parties=json.loads(row["parties"]),
+        issues=[JudgmentIssue.model_validate(item) for item in json.loads(row["issues"])],
+        legislation=_load_refs(row["legislation"]),
+        cases_cited=[
+            CaseCitation.model_validate(item) for item in json.loads(row["cases_cited"])
+        ],
+        orders=row["orders"],
+    )
+
+
+def find_source_by_citation(conn: sqlite3.Connection, citation: str) -> Source | None:
+    """Find the Source for a neutral citation (exact, case/whitespace-insensitive).
+
+    Powers CaseCitation.internal_ref cross-linking (pseudocode section 3 step 5).
+    """
+    target = _normalise_citation(citation)
+    if not target:
+        return None
+    for row in conn.execute("SELECT source_id, citation FROM judgment_meta"):
+        if _normalise_citation(row["citation"]) == target:
+            return get_source(conn, row["source_id"])
+    return None
+
+
+def list_judgment_citations(conn: sqlite3.Connection) -> dict[str, str]:
+    """Map normalised-lowercase citation -> source id, for batch cross-linking."""
+    return {
+        _normalise_citation(row["citation"]): row["source_id"]
+        for row in conn.execute(
+            "SELECT citation, source_id FROM judgment_meta ORDER BY created_at, source_id"
+        )
+        if _normalise_citation(row["citation"])
+    }

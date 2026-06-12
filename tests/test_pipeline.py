@@ -251,11 +251,6 @@ def test_run_source_dry_run_makes_no_writes(conn):
     assert db.list_registry(conn) == []
 
 
-def test_run_source_rejects_judgment_table(conn):
-    with pytest.raises(PipelineError, match="judgment pipeline"):
-        run_source(conn, make_zeeker_client(), None, None, "zeeker-judgements/judgments")
-
-
 def test_run_source_rejects_malformed_source(conn):
     with pytest.raises(PipelineError, match="<database>/<table>"):
         run_source(conn, make_zeeker_client(), None, None, "sglawwatch")

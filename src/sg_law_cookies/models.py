@@ -30,6 +30,9 @@ class RawItem(BaseModel):
     source_id: str  # Zeeker database, e.g. "sglawwatch"
     item_type: ItemType
     license: str  # underlying source's terms, from Zeeker catalogue metadata
+    # Table-specific context (e.g. judgment citation, court, court_summary,
+    # subject_tags, text_source) that downstream pipelines may use.
+    extras: dict[str, str] = Field(default_factory=dict)
 
 
 class FolioRef(BaseModel):

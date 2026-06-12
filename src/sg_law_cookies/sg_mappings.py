@@ -33,19 +33,34 @@ _register("Attorney-General's Chambers", "AGC")
 _register("Intellectual Property Office of Singapore", "IPOS")
 _register("Monetary Authority of Singapore", "MAS")
 _register("Singapore Exchange", "SGX", "Singapore Exchange Limited")
-_register("State Courts", "State Courts of Singapore")
-_register("Singapore International Commercial Court", "SICC")
-_register("Family Justice Courts", "FJC")
+_register("State Courts", "State Courts of Singapore", "State Courts of the Republic of Singapore")
 _register(
-    "Supreme Court of Singapore",
+    "Singapore International Commercial Court",
+    "SICC",
+    "Singapore International Commercial Court of the Republic of Singapore",
+)
+_register("Family Justice Courts", "FJC", "Family Justice Courts of the Republic of Singapore")
+_register("Supreme Court of Singapore")
+_register(
     "Court of Appeal of Singapore",
+    "Court of Appeal",
     "Singapore Court of Appeal",
+    "Court of Appeal of the Republic of Singapore",
+    "SGCA",
 )
 _register(
     "High Court of Singapore",
+    "High Court",
     "Singapore High Court",
     "General Division of the High Court",
+    "General Division of the High Court of Singapore",
+    "General Division of the High Court of the Republic of Singapore",
+    "SGHC",
+    # The Appellate Division sits within the High Court (SCJA s 9A).
     "Appellate Division of the High Court",
+    "Appellate Division of the High Court of Singapore",
+    "Appellate Division of the High Court of the Republic of Singapore",
+    "SGHC(A)",
 )
 _register("Competition and Consumer Commission of Singapore", "CCCS")
 _register("Infocomm Media Development Authority", "IMDA")
