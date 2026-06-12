@@ -254,17 +254,68 @@ class ZeekerClient:
 
         rows: list[dict[str, Any]] = []
         next_token: str | None = None
-        while len(rows) < limit:
-            params = dict(base_params)
-            params["_size"] = str(min(PAGE_SIZE, limit - len(rows)))
+        try:
+            while len(rows) < limit:
+                params = dict(base_params)
+                params["_size"] = str(min(PAGE_SIZE, limit - len(rows)))
+                if next_token is not None:
+                    params["_next"] = next_token
+                page = self._get(f"/{db}/{table}.json", params=params)
+                rows.extend(page.get("rows", []))
+                next_token = page.get("next")
+                if not next_token:
+                    break
+        except httpx.HTTPStatusError as exc:
+            # Large tables (zeeker-judgements) time out Datasette's SQL
+            # limit when filtering/sorting on the unindexed watermark
+            # column. rowid IS indexed and correlates with import order,
+            # so walk newest-first by rowid and filter client-side.
+            if since is None or exc.response.status_code not in (400, 500, 503):
+                raise
+            return self._fetch_new_rows_by_rowid(db, table, ts_col, since, limit)
+        return rows[:limit]
+
+    # Safety cap for the rowid fallback: stop walking after this many rows
+    # even if we haven't reached the watermark (protects against a table
+    # whose rowid order doesn't correlate with the watermark column).
+    _ROWID_WALK_CAP = 2000
+
+    def _fetch_new_rows_by_rowid(
+        self,
+        db: str,
+        table: str,
+        ts_col: str,
+        since: str,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        collected: list[dict[str, Any]] = []
+        next_token: str | None = None
+        walked = 0
+        while walked < self._ROWID_WALK_CAP:
+            params: dict[str, str] = {
+                "_shape": "objects",
+                "_sort_desc": "rowid",
+                "_size": str(PAGE_SIZE),
+            }
             if next_token is not None:
                 params["_next"] = next_token
             page = self._get(f"/{db}/{table}.json", params=params)
-            rows.extend(page.get("rows", []))
-            next_token = page.get("next")
-            if not next_token:
+            page_rows = page.get("rows", [])
+            if not page_rows:
                 break
-        return rows[:limit]
+            walked += len(page_rows)
+            hit_watermark = False
+            for row in page_rows:
+                ts = row.get(ts_col)
+                if ts is not None and str(ts) <= since:
+                    hit_watermark = True
+                    break
+                collected.append(row)
+            next_token = page.get("next")
+            if hit_watermark or not next_token:
+                break
+        collected.sort(key=lambda r: str(r.get(ts_col) or ""))
+        return collected[:limit]
 
     def to_raw_item(self, db: str, table: str, row: dict[str, Any]) -> RawItem | None:
         """Map a Zeeker row to a RawItem (source_url = original document URL).

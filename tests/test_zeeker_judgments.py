@@ -16,6 +16,7 @@ pdpc/enforcement_decisions: id, title, organisation, decision_type,
 from datetime import date
 
 import pytest
+import httpx
 import respx
 
 from sg_law_cookies.zeeker import (
@@ -225,3 +226,25 @@ def test_live_fetch_judgments():
         assert item.extras["citation"]
         assert item.extras["court"]
         assert len(item.extras.get("court_summary", "")) <= COURT_SUMMARY_EXTRA_LIMIT
+
+
+@respx.mock
+def test_watermark_timeout_falls_back_to_rowid_walk():
+    # Regression: Datasette times out (400) filtering/sorting the unindexed
+    # created_at column on the large judgments table; client must fall back
+    # to a rowid-descending walk with client-side filtering.
+    def router(request):
+        params = dict(request.url.params)
+        if "created_at__gt" in params:
+            return httpx.Response(400, json={"ok": False, "error": "SQL query took too long"})
+        assert params.get("_sort_desc") == "rowid"
+        return httpx.Response(200, json={"rows": [
+            {"rowid": 12, "id": "c", "created_at": "2026-06-08T05:00:00"},
+            {"rowid": 11, "id": "b", "created_at": "2026-06-05T05:00:00"},
+            {"rowid": 10, "id": "a", "created_at": "2026-05-20T05:00:00"},  # behind watermark
+        ], "next": None})
+
+    respx.get(url__regex=r".*judgments\.json.*").mock(side_effect=router)
+    client = ZeekerClient()
+    rows = client.fetch_new_rows("zeeker-judgements", "judgments", since="2026-06-01T00:00:00", limit=10)
+    assert [r["id"] for r in rows] == ["b", "c"]  # ascending, watermark row excluded
