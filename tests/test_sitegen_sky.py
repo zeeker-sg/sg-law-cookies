@@ -6,7 +6,13 @@ from datetime import date, datetime, timezone
 import pytest
 
 from sg_law_cookies import db
-from sg_law_cookies.models import Cookie, FolioRef, Source
+from sg_law_cookies.models import (
+    Cookie,
+    FolioRef,
+    JudgmentIssue,
+    JudgmentMeta,
+    Source,
+)
 from sg_law_cookies.sitegen import build_site
 
 BASE_URL = "https://cookies.example.org"
@@ -80,7 +86,39 @@ def populated(conn):
         headline="CA resets the test for wrongful dismissal",
         significance="high",
         folio_areas=[_ref("Employment Law"), _ref("Civil Procedure")],
+        folio_concepts=[
+            _ref("dismissal", "concepts"),  # resolved (has iri)
+            # unresolved placeholder -> must NOT appear in emitted JSON
+            FolioRef(
+                iri=None,
+                preferred_label="UNRESOLVED-CONCEPT-SHOULD-NOT-EMIT",
+                branch="unresolved",
+                confidence=0.0,
+            ),
+            # sg_local refs have no iri but count as resolved
+            FolioRef(
+                iri=None,
+                preferred_label="Ministry of Manpower",
+                branch="sg_local",
+                confidence=1.0,
+            ),
+        ],
         created_at=d1,
+    )
+    db.save_judgment_meta(
+        conn,
+        "src-judg",
+        JudgmentMeta(
+            source_id="src-judg",
+            citation="[2026] SGCA 17",
+            issues=[
+                JudgmentIssue(
+                    question="Was the dismissal wrongful?",
+                    holding="Yes; the test is recalibrated.",
+                    reasoning="Because reasons.",
+                )
+            ],
+        ),
     )
     _cookie(
         conn,
@@ -139,13 +177,20 @@ def test_per_day_json_matches_contract(built):
     assert day["areas"], "areas must not be empty"
     counts = [a["count"] for a in day["areas"]]
     assert counts == sorted(counts, reverse=True)  # desc by count
+    V1_KEYS = {"h", "sig", "kind"}
+    V2_KEYS = {"id", "headline", "summary", "why", "url", "src", "concepts"}
     for area in day["areas"]:
         assert set(area.keys()) == {"label", "count", "high", "cookies"}
         for c in area["cookies"]:
-            assert set(c.keys()) == {"h", "sig", "kind"}
+            assert V1_KEYS | V2_KEYS <= set(c.keys())
             assert len(c["h"]) <= 90
             assert c["sig"] in {"high", "medium", "low"}
             assert c["kind"] in {"news", "judgment"}
+            assert len(c["id"]) == 12
+            assert isinstance(c["url"], str) and c["url"]
+            assert isinstance(c["concepts"], list)
+            # issues key is judgment-only
+            assert ("issues" in c) == (c["kind"] == "judgment")
 
     for tie in day["ties"]:
         assert set(tie.keys()) == {"a", "b", "w"}
@@ -159,6 +204,34 @@ def test_per_day_json_matches_contract(built):
     assert (out / "data" / "sky" / "2026-06-10.json").exists()
 
 
+def test_per_day_json_v2_cookie_payloads(built):
+    """sitegen-emitted JSON carries the v2 cookie fields end to end."""
+    out, _ = built
+    day = json.loads((out / "data" / "sky" / "2026-06-11.json").read_text())
+    cookies = {c["headline"]: c for a in day["areas"] for c in a["cookies"]}
+
+    judg = cookies["CA resets the test for wrongful dismissal"]
+    assert judg["kind"] == "judgment"
+    assert judg["url"] == "https://www.judiciary.gov.sg/judgments/abc-v-def"
+    assert judg["src"] == "[2026] SGCA 17"  # judgment_meta citation
+    assert judg["issues"] == [
+        {"q": "Was the dismissal wrongful?", "hold": "Yes; the test is recalibrated."}
+    ]
+    # resolved iri + sg_local kept; unresolved placeholder dropped
+    assert judg["concepts"] == ["dismissal", "Ministry of Manpower"]
+
+    news = cookies["MOM updates work pass rules"]
+    assert news["kind"] == "news"
+    assert "issues" not in news
+    assert news["url"] == "https://www.mom.gov.sg/newsroom/x"
+    assert news["why"] == "It matters."
+    assert news["summary"] == "A summary."
+
+    # unresolved labels never reach the emitted file at all
+    raw = (out / "data" / "sky" / "2026-06-11.json").read_text()
+    assert "UNRESOLVED-CONCEPT-SHOULD-NOT-EMIT" not in raw
+
+
 def test_counter_map_page_vendored_d3_no_cdn(built):
     out, _ = built
     page = out / "counter-map" / "index.html"
@@ -167,12 +240,15 @@ def test_counter_map_page_vendored_d3_no_cdn(built):
     assert "/static/d3.v7.min.js" in html
     for marker in CDN_MARKERS:
         assert marker not in html, marker
-    assert "/data/sky/index.json" in html
+    # page JS is external: the page references sky.js, which does the fetch
+    assert '/static/sky.js' in html
     assert "kuih bangkit" in html
     # static assets the page needs were copied
     assert (out / "static" / "d3.v7.min.js").exists()
     assert (out / "static" / "sky.css").exists()
+    assert (out / "static" / "sky.js").exists()
     assert (out / "static" / "site.css").exists()
+    assert "/data/sky/index.json" in (out / "static" / "sky.js").read_text()
 
 
 def test_nav_doorway_on_every_page(built):

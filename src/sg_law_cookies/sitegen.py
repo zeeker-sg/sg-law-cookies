@@ -361,7 +361,7 @@ def build_site(conn: sqlite3.Connection, out_dir: Path, base_url: str) -> BuildR
         )
 
     (out_dir / "static").mkdir(parents=True, exist_ok=True)
-    for asset in ("site.css", "sky.css", "d3.v7.min.js"):
+    for asset in ("site.css", "sky.css", "sky.js", "d3.v7.min.js"):
         shutil.copyfile(_STATIC_DIR / asset, out_dir / "static" / asset)
 
     return report

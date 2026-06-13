@@ -5,15 +5,23 @@
        (sitegen emits them), not inlined; an in-page cache avoids refetches.
     2. D3 is vendored at /static/d3.v7.min.js — no CDN.
     3. Page CSS lives in /static/sky.css on top of the site.css tokens.
-    4. The scrubber shows AT MOST the most recent 14 days; older days will
+    4. ALL page JS lives in /static/sky.js (deferred) — no inline scripts.
+    5. The scrubber shows AT MOST the most recent 14 days; older days will
        become reachable via the archive in a later phase.
-    5. Empty index → "the counter is bare" graceful state. -#}
+    6. Empty index → "the counter is bare" graceful state.
+    Phase 6 adds Levels 2–3 (PRD §7.2–7.3, §7.7): focus mode fans an area's
+    cookies out as typed nodes (round disc = news, hexagon = judgment,
+    pineapple-tart styling = high significance) with chocolate-chip dots for
+    shared FOLIO concepts; #focus-list is the ≤720px list degradation; the
+    #panel dialog is the Level-3 cookie detail (right card / bottom sheet),
+    deep-linked via #<date> and #<date>/<cookieid>. -#}
 
 {% block title %}SG Law Cookies — the counter map{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="/static/sky.css">
 <script src="/static/d3.v7.min.js"></script>
+<script src="/static/sky.js" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -36,180 +44,34 @@
   <p id="sky-empty" class="sky-empty" hidden>the counter is bare — nothing has come out of the oven yet.</p>
 
   <div class="scrub" id="scrub"></div>
+
+  {#- ≤720px Level-2 degradation: focus mode renders the area's cookies as a
+      stacked price-card list here instead of spatial nodes (PRD §7.7). -#}
+  <div id="focus-list" class="focus-list" hidden></div>
+
   <p class="legend"><a class="kuih" href="https://en.wikipedia.org/wiki/Kue_bangkit" target="_blank" rel="noopener">kuih bangkit</a> = area of law · size = the day's bake · <span class="t">red dot</span> = still warm · <span class="o">ochre threads</span> = shared doctrine this week</p>
 </section>
 
 <div id="tip"></div>
 
-<script>
-const svg = d3.select('#sky');
-const W = 1000, H = 560, CX = W/2, CY = H/2 - 6;
-const tip = document.getElementById('tip');
-let nodes = [], links = [], sim = null, active = -1;
-let SCRUB = [];                       // [{date,total,high}] — at most the 14 most recent days
-const dayCache = new Map();           // date → per-day sky JSON, fetched once
-
-const r = c => 16 + Math.sqrt(c) * 15;
-const petals = d => 7 + (d.label.length % 4);          // handmade mould variety
-const rosette = (R, n) => {
-  const line = d3.lineRadial().angle(p=>p[0]).radius(p=>p[1]).curve(d3.curveCatmullRomClosed);
-  return line(d3.range(0, 2*Math.PI, Math.PI/72).map(t => [t, R*(0.88 + 0.12*Math.cos(n*t))]));
-};
-
-async function loadDay(date) {
-  if (dayCache.has(date)) return dayCache.get(date);
-  const res = await fetch(`/data/sky/${date}.json`);
-  if (!res.ok) throw new Error(`sky data missing for ${date}`);
-  const day = await res.json();
-  dayCache.set(date, day);
-  return day;
-}
-
-function buildNodes(day) {
-  const prev = new Map(nodes.map(n => [n.id, n]));
-  const out = [{ id:'__centre', centre:true, fx:CX, fy:CY }];
-  day.areas.forEach((a, i) => {
-    const old = prev.get(a.label);
-    const angle = (i / day.areas.length) * 2 * Math.PI - Math.PI/2;
-    out.push({
-      id:a.label, label:a.label, count:a.count, high:a.high, cookies:a.cookies,
-      x: old ? old.x : CX + Math.cos(angle)*200,
-      y: old ? old.y : CY + Math.sin(angle)*160,
-    });
-  });
-  return out;
-}
-
-async function render(idx) {
-  active = idx;
-  const day = await loadDay(SCRUB[idx].date);
-  const when = new Date(day.date+'T12:00:00');
-  document.getElementById('dayname').textContent =
-    when.toLocaleDateString('en-SG',{weekday:'long', day:'numeric', month:'long'});
-  const t = day.totals;
-  document.getElementById('stats').innerHTML =
-    `<b>${t.total}</b> cookies &nbsp;·&nbsp; ${t.news} news ○ &nbsp;·&nbsp; ${t.judgments} judgments ⬡ &nbsp;·&nbsp; <span class="hot">${t.high} still warm ▲</span>`;
-  document.querySelectorAll('.day').forEach((el,i)=>el.classList.toggle('active', i===idx));
-
-  nodes = buildNodes(day);
-  links = nodes.filter(n=>!n.centre).map(n => ({source:'__centre', target:n.id, spoke:true}));
-  (day.ties||[]).forEach(t => links.push({source:t.a, target:t.b, w:t.w}));
-
-  if (sim) sim.stop();
-  sim = d3.forceSimulation(nodes)
-    .force('link', d3.forceLink(links).id(d=>d.id)
-      .distance(d => d.spoke ? 150 + r(d.target.count||1) : 90)
-      .strength(d => d.spoke ? .18 : Math.min(.7, .22 * d.w)))
-    .force('charge', d3.forceManyBody().strength(-260))
-    .force('collide', d3.forceCollide(d => d.centre ? 50 : r(d.count) + 26))
-    .force('x', d3.forceX(CX).strength(.05)).force('y', d3.forceY(CY).strength(.07))
-    .on('tick', tick);
-
-  // edges: dotted spokes to the centre, ochre weighted doctrine ties
-  const edge = svg.selectAll('line.e').data(links, d=>(d.source.id||d.source)+'|'+(d.target.id||d.target));
-  edge.exit().remove();
-  edge.enter().append('line').attr('class','e');
-  svg.selectAll('line.e')
-    .attr('stroke', d=>d.spoke ? 'var(--line-strong)' : 'var(--ochre)')
-    .attr('stroke-dasharray', d=>d.spoke ? '2 6' : null)
-    .attr('stroke-opacity', d=>d.spoke ? .7 : .55)
-    .attr('stroke-width', d=>d.spoke ? 1 : Math.min(3.5, .9 * (d.w||1)));
-
-  // node groups — one kuih bangkit rosette per area of law
-  const g = svg.selectAll('g.n').data(nodes.filter(n=>!n.centre), d=>d.id);
-  g.exit().transition().duration(450).style('opacity',0).remove();
-  const enter = g.enter().append('g').attr('class','n').style('cursor','pointer').attr('filter','url(#soft)');
-  enter.append('circle').attr('class','halo').attr('fill','none');
-  enter.append('path').attr('class','body');
-  enter.append('circle').attr('class','dot');
-  enter.append('text').attr('class','cnt').attr('text-anchor','middle').attr('dy','.34em');
-  enter.append('text').attr('class','lbl').attr('text-anchor','middle');
-  const all = enter.merge(g);
-  all.select('path.body').transition().duration(600)
-    .attr('d', d=>rosette(r(d.count), petals(d)))
-    .attr('fill', 'url(#bangkit)')
-    .attr('stroke', d=> d.high ? 'var(--terracotta)' : 'var(--line-strong)')
-    .attr('stroke-opacity', 1)
-    .attr('stroke-width', d=> d.high ? 2 : 1.2)
-    .attr('stroke-dasharray', d=> d.high ? '1 4' : null)
-    .attr('stroke-linecap', 'round');
-  all.select('circle.dot')
-    .attr('fill', '#C2412E')
-    .attr('cy', d => -r(d.count) * 0.42)
-    .transition().duration(600)
-    .attr('r', d => d.high ? Math.max(4, r(d.count)*0.12) : 0);
-  all.select('circle.halo')
-    .attr('stroke','var(--terracotta)').attr('stroke-opacity',.45)
-    .attr('r', d=>r(d.count)+9)
-    .style('display', d=>d.high?null:'none');
-  all.select('text.cnt').text(d=>d.count).attr('font-size', d=> 13 + Math.sqrt(d.count)*2).attr('fill','var(--chip)');
-  all.select('text.lbl').text(d=>d.label.replace(' and ',' & ').replace(' Law',''))
-    .attr('dy', d=>r(d.count)+16);
-  all.on('mousemove', (ev,d)=>{
-      tip.style.opacity=1; tip.style.left=(ev.clientX+16)+'px'; tip.style.top=(ev.clientY-10)+'px';
-      tip.innerHTML = `<span class="a">${d.label} · ${d.count} cookie${d.count>1?'s':''}</span><ul>` +
-        d.cookies.slice(0,4).map(c=>`<li>${c.sig==='high'?'▲ ':''}${c.kind==='judgment'?'⬡ ':'○ '}${c.h}…</li>`).join('') +
-        (d.cookies.length>4?`<li>+${d.cookies.length-4} more</li>`:'') + '</ul>';
-    }).on('mouseleave', ()=>{ tip.style.opacity=0; });
-
-  // centre date node — yellow price tag
-  const c = svg.selectAll('g.c').data([day.date]);
-  const cEnter = c.enter().append('g').attr('class','c').attr('transform',`translate(${CX},${CY})`);
-  cEnter.append('rect').attr('x',-34).attr('y',-26).attr('width',68).attr('height',52).attr('rx',2)
-    .attr('fill','#F7E27D').attr('stroke','#D9B43B').attr('transform','rotate(-2)');
-  cEnter.append('text').attr('class','lbl').attr('text-anchor','middle').attr('dy','-3');
-  cEnter.append('text').attr('class','cnt').attr('text-anchor','middle').attr('dy','15').attr('font-size','17');
-  svg.select('g.c .lbl').attr('fill','var(--terracotta)')
-    .text(when.toLocaleDateString('en-SG',{month:'short'}).toUpperCase());
-  svg.select('g.c .cnt').text(+day.date.slice(8));
-
-  // pulse animation on halos
-  svg.selectAll('circle.halo')
-    .transition().duration(1600).ease(d3.easeSinInOut).attr('stroke-opacity',.12)
-    .transition().duration(1600).ease(d3.easeSinInOut).attr('stroke-opacity',.45)
-    .on('end', function repeat(){
-      d3.select(this)
-        .transition().duration(1600).ease(d3.easeSinInOut).attr('stroke-opacity',.12)
-        .transition().duration(1600).ease(d3.easeSinInOut).attr('stroke-opacity',.45)
-        .on('end', repeat);
-    });
-}
-
-function tick() {
-  svg.selectAll('line.e')
-    .attr('x1',d=>d.source.x).attr('y1',d=>d.source.y)
-    .attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
-  svg.selectAll('g.n').attr('transform', d=>`translate(${d.x},${d.y})`);
-}
-
-(async function init() {
-  let days = [];
-  try {
-    const res = await fetch('/data/sky/index.json');
-    if (res.ok) days = (await res.json()).days || [];
-  } catch (e) { days = []; }
-
-  // At most the 14 most recent days on the scrubber; the index is ascending,
-  // so slice from the tail. Older days become reachable via the archive in a
-  // later phase.
-  SCRUB = days.slice(-14);
-
-  if (!SCRUB.length) {
-    document.getElementById('sky').style.display = 'none';
-    document.getElementById('sky-empty').hidden = false;
-    document.getElementById('dayname').textContent = 'a quiet day';
-    return;
-  }
-
-  const scrub = document.getElementById('scrub');
-  SCRUB.forEach((d,i)=>{
-    const b = document.createElement('button'); b.className='day';
-    const dt = new Date(d.date+'T12:00:00');
-    b.innerHTML = `${dt.toLocaleDateString('en-SG',{month:'short'}).toUpperCase()}<b>${dt.getDate()}</b>`;
-    b.onclick = ()=>render(i);
-    scrub.appendChild(b);
-  });
-  render(SCRUB.length - 1);   // initial day = most recent entry on the index
-})();
-</script>
+{#- Level 3 — cookie detail panel. Desktop: right-side parchment card with a
+    price-card-style header; mobile: bottom sheet. sky.js fills it in. -#}
+<div id="panel-backdrop" hidden></div>
+<aside id="panel" class="cookie-panel" role="dialog" aria-modal="true" aria-labelledby="panel-headline" hidden>
+  <header class="panel-tag">
+    <span id="panel-meta"></span>
+    <button id="panel-close" type="button" aria-label="Close cookie detail">×</button>
+  </header>
+  <div class="panel-body">
+    <h2 id="panel-headline"></h2>
+    <p id="panel-summary" class="panel-summary"></p>
+    <p id="panel-why" class="panel-why" hidden><b>Why it matters</b><span></span></p>
+    <div id="panel-issues" class="panel-issues" hidden>
+      <h3>What the court decided</h3>
+      <div class="issues"></div>
+    </div>
+    <div id="panel-concepts" class="panel-concepts" hidden></div>
+    <a id="panel-source" class="panel-go" target="_blank" rel="noopener" hidden></a>
+  </div>
+</aside>
 {% endblock %}

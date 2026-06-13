@@ -57,6 +57,104 @@
 a.kuih { color: inherit; text-decoration: underline dotted var(--terracotta); text-underline-offset: 3px; }
 a.kuih:hover { color: var(--terracotta); }
 
+/* ── Level 2 — focus mode (cluster expansion) ────── */
+/* fade the rest of the counter while one area's cookies fan out */
+#sky g.n { transition: opacity .3s ease; outline: none; }
+#sky line.e { transition: opacity .3s ease; }
+#sky.focused g.n:not(.focus-area) { opacity: .25; pointer-events: none; }
+#sky.focused line.e.spoke { opacity: .25; }
+#sky.focused line.e:not(.spoke) { opacity: 0; }     /* doctrine ties hide in focus */
+#sky g.n:focus-visible path.body { stroke: var(--color-accent); stroke-width: 2.5; }
+
+/* typed cookie nodes: disc = news, hexagon = judgment, tart = high sig */
+#sky g.cookie { outline: none; }
+#sky g.cookie:focus-visible .body { stroke: var(--color-accent); stroke-width: 2; }
+#sky g.cookie .speck { fill: var(--chip); opacity: .85; pointer-events: none; }
+#sky .chip-link { stroke: var(--chip); stroke-opacity: .3; stroke-width: 1; }
+#sky .chip-node { fill: var(--chip); stroke: var(--cream); stroke-width: 1; }
+
+/* ── mobile focus list (≤720px Level-2 degradation) ─ */
+.focus-list { max-width: 640px; margin: 4px auto 14px; padding: 0 12px; display: grid; gap: 10px; }
+.focus-list[hidden] { display: none; }
+.fl-head { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--terracotta); text-align: center; padding-top: 4px; }
+.fcard {
+  display: block; width: 100%; text-align: left; cursor: pointer; font-family: inherit; color: var(--ink);
+  background: #FDFBF4; border: 1px solid var(--line); border-radius: 4px; padding: 11px 14px 12px;
+  box-shadow: 0 8px 18px -12px rgba(20, 32, 31, .35);
+}
+.fcard.hot { border-color: var(--terracotta); }
+.fcard .meta { display: flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); }
+.fcard .meta .tag {
+  background: linear-gradient(180deg, #FAEA92, var(--pricecard)); border: 1px solid var(--pricecard-edge);
+  border-radius: 2px; padding: 1px 6px; color: var(--ink); transform: rotate(-1deg);
+}
+.fcard.hot .meta { color: var(--terracotta); }
+.fcard .h { display: block; font-size: 15px; font-weight: 700; line-height: 1.35; margin-top: 5px; }
+
+/* ── Level 3 — cookie detail panel ───────────────── */
+#panel-backdrop { position: fixed; inset: 0; background: rgba(20, 32, 31, .35); z-index: 30; }
+#panel-backdrop[hidden] { display: none; }
+.cookie-panel {
+  position: fixed; top: 24px; right: 24px; bottom: 24px; width: 360px; max-width: calc(100vw - 48px);
+  z-index: 31; display: flex; flex-direction: column; overflow: hidden;
+  background: #FDFBF4; border: 1px solid var(--line); border-radius: 4px;
+  box-shadow: 0 30px 60px -25px rgba(20, 32, 31, .55);
+}
+.cookie-panel[hidden] { display: none; }
+/* price-card-style header strip */
+.panel-tag {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: none;
+  background: linear-gradient(180deg, #FAEA92, var(--pricecard)); border-bottom: 1px solid var(--pricecard-edge);
+  padding: 9px 12px 8px;
+}
+#panel-meta { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
+#panel-close {
+  flex: none; cursor: pointer; background: none; border: 1px solid var(--pricecard-edge); border-radius: 2px;
+  color: var(--ink); font-size: 17px; line-height: 1; width: 26px; height: 26px; padding: 0;
+}
+#panel-close:hover { background: rgba(255, 255, 255, .5); }
+.panel-body { padding: 18px 20px 20px; overflow-y: auto; }
+#panel-headline { font-family: var(--serif); font-size: 20px; font-weight: 700; line-height: 1.3; margin: 0 0 10px; }
+.panel-summary { font-size: 14.5px; line-height: 1.55; color: var(--ink-dim); }
+/* why-it-matters: the ochre-bordered callout, same idiom as the daily page */
+.panel-why {
+  margin-top: 14px; padding: 9px 13px; font-size: 13.5px; font-style: italic; color: var(--ink-dim);
+  border-left: 3px solid var(--ochre); background: var(--color-surface-sunken); border-radius: 0 3px 3px 0;
+}
+.panel-why b { display: block; font-family: var(--mono); font-style: normal; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ochre); margin-bottom: 3px; }
+.panel-why[hidden] { display: none; }
+.panel-issues { margin-top: 16px; }
+.panel-issues[hidden] { display: none; }
+.panel-issues h3 { font-family: var(--mono); font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--terracotta); margin: 0 0 8px; }
+.panel-issues details { border-top: 1px dashed var(--line); padding: 7px 0; }
+.panel-issues details:last-child { border-bottom: 1px dashed var(--line); }
+.panel-issues summary { cursor: pointer; font-size: 13.5px; font-weight: 700; line-height: 1.4; }
+.panel-issues details p { font-size: 13.5px; line-height: 1.5; color: var(--ink-dim); padding: 6px 0 2px 14px; }
+/* FOLIO concept pills — chocolate chips, spelled out */
+.panel-concepts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+.panel-concepts[hidden] { display: none; }
+.panel-concepts .pill {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim);
+  background: var(--color-surface-sunken); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px 3px 7px;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.panel-concepts .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--chip); }
+.panel-go {
+  display: inline-block; margin-top: 18px; font-family: var(--mono); font-size: 12px; font-weight: 700;
+  text-decoration: none; white-space: nowrap; color: var(--ink); background: var(--dough);
+  border: 1px solid var(--dough-toast); border-radius: var(--radius-sm); padding: 9px 14px;
+}
+.panel-go:hover { filter: brightness(1.07); }
+.panel-go[hidden] { display: none; }
+
+/* mobile: the panel becomes a bottom sheet over the focus list */
+@media (max-width: 720px) {
+  .cookie-panel {
+    top: auto; left: 0; right: 0; bottom: 0; width: auto; max-width: none; max-height: 78vh;
+    border-radius: 10px 10px 0 0; border-left: 0; border-right: 0; border-bottom: 0;
+  }
+}
+
 /* ── tooltip ─────────────────────────────────────── */
 #tip { position: fixed; pointer-events: none; background: var(--cream); color: var(--ink); border-radius: 3px;
   padding: 10px 13px; font-size: 13px; max-width: 300px; opacity: 0; transition: opacity .12s; z-index: 10;

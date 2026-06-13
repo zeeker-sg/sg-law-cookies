@@ -6,14 +6,17 @@ exactly (duplicate-flagged cookies are skipped) so the counter map and the
 daily pages never disagree on counts.
 """
 
+import hashlib
 import sqlite3
 from datetime import date, timedelta
 
 from sg_law_cookies import db
 from sg_law_cookies.models import Cookie, Source
+from sg_law_cookies.sg_mappings import SG_LOCAL_BRANCH
 
 HEADLINE_MAX = 90
 TIE_WINDOW_DAYS = 7
+ISSUES_MAX = 8
 
 _SIG_RANK = {"high": 0, "medium": 1, "low": 2}
 
@@ -48,6 +51,70 @@ def _kind(sources: list[Source]) -> str:
 
 def _pair(a: str, b: str) -> tuple[str, str]:
     return (a, b) if a <= b else (b, a)
+
+
+# ── v2 cookie payload helpers ────────────────────────────────────────
+
+
+def _cookie_hash(cookie_id: str) -> str:
+    """Stable public id: sha256 of the cookie id, first 12 hex chars
+    (zeeker-publish convention)."""
+    return hashlib.sha256(cookie_id.encode("utf-8")).hexdigest()[:12]
+
+
+def _concept_labels(cookie: Cookie) -> list[str]:
+    """Distinct resolved FOLIO concept labels, in stored order.
+
+    Resolved means iri is not null OR branch is sg_local; unresolved
+    placeholder refs (iri=None, other branches) are excluded.
+    """
+    seen: list[str] = []
+    for ref in cookie.folio_concepts:
+        if not ref.preferred_label:
+            continue
+        if ref.iri is None and ref.branch != SG_LOCAL_BRANCH:
+            continue
+        if ref.preferred_label not in seen:
+            seen.append(ref.preferred_label)
+    return seen
+
+
+def _url_and_src(
+    conn: sqlite3.Connection, sources: list[Source], day: date
+) -> tuple[str, str]:
+    """(url, src) from the first source; sourceless mirrors sitegen's
+    day-page fallback (url=/d/<date>/, label COOKIES)."""
+    # Lazy import: sitegen imports skydata at module level.
+    from sg_law_cookies.sitegen import source_label
+
+    if not sources:
+        return f"/d/{day.isoformat()}/", "COOKIES"
+    first = sources[0]
+    src = source_label(first)
+    if first.item_type == "judgment":
+        meta = db.get_judgment_meta(conn, first.id)
+        if meta is not None and meta.citation:
+            src = meta.citation
+    return first.source_url, src
+
+
+def _judgment_issues(conn: sqlite3.Connection, sources: list[Source]) -> list[dict]:
+    """Issue dicts (q + hold) from judgment_meta on the first judgment-typed
+    source. Empty holdings omit the "hold" key; capped at ISSUES_MAX."""
+    for source in sources:
+        if source.item_type != "judgment":
+            continue
+        meta = db.get_judgment_meta(conn, source.id)
+        if meta is None:
+            return []
+        issues = []
+        for issue in meta.issues[:ISSUES_MAX]:
+            entry = {"q": issue.question}
+            if issue.holding:
+                entry["hold"] = issue.holding
+            issues.append(entry)
+        return issues
+    return []
 
 
 # ── ties (trailing 7-day window ending at day D) ─────────────────────
@@ -108,12 +175,23 @@ def build_sky_day(conn: sqlite3.Connection, day: date) -> dict:
 
     grouped: dict[str, list[tuple[int, int, dict, str]]] = {}
     for idx, cookie in enumerate(cookies):
-        kind = _kind(sources_map.get(cookie.id, []))
+        srcs = sources_map.get(cookie.id, [])
+        kind = _kind(srcs)
+        url, src = _url_and_src(conn, srcs, day)
         entry = {
+            "id": _cookie_hash(cookie.id),
             "h": cookie.headline[:HEADLINE_MAX],
+            "headline": cookie.headline,
+            "summary": cookie.summary,
+            "why": cookie.why_it_matters,
             "sig": cookie.significance,
             "kind": kind,
+            "url": url,
+            "src": src,
+            "concepts": _concept_labels(cookie),
         }
+        if kind == "judgment":
+            entry["issues"] = _judgment_issues(conn, srcs)
         grouped.setdefault(_primary_area(cookie), []).append(
             (_SIG_RANK[cookie.significance], idx, entry, cookie.significance)
         )
