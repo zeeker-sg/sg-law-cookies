@@ -1,0 +1,161 @@
+{% extends "base.html.j2" %}
+{% from "_macros.html.j2" import ticker_spans, kind_glyph %}
+
+{% block title %}Week {{ week_num }}, {{ year }} ({{ range_display }}) — SG Law Cookies{% endblock %}
+
+{% block content %}
+  <!-- shop window: the week's count + weekly docket -->
+  <section class="window">
+    <div class="e2">
+      <div class="hangsign-wrap">
+        <div class="hangsign">
+          <div class="l1">THE WEEKLY BAKE · {{ week_label }}</div>
+          <div class="l2">{{ range_display }}</div>
+        </div>
+      </div>
+      <div class="count-row">
+        <div class="count-card">
+          <b>{{ totals.total }}</b>
+          <span>cookies this week</span>
+        </div>
+        <div class="count-cap">
+          <h2>the week's <em>batch</em><br>cooled &amp; sorted</h2>
+          <p>Seven days of Singapore legal signal, with the patterns that rose out of it.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="docket-wrap e3">
+      <div class="docket">
+        <h3>★ THE WEEKLY BAKE ★</h3>
+        <div class="ln"><span>WEEK</span><span>{{ week_label }} · {{ year }}</span></div>
+        <div class="ln"><span>DATES</span><span>{{ range_display }}</span></div>
+        <div class="ln"><span>DAYS BAKED</span><span>{{ days_baked }}/7</span></div>
+        <hr>
+        <div class="ln"><span>○ NEWS</span><span>{{ totals.news }}</span></div>
+        <div class="ln"><span>⬡ JUDGMENTS</span><span>{{ totals.judgments }}</span></div>
+        <div class="ln warm"><span>▲ PINEAPPLE TARTS</span><span>{{ totals.high }}</span></div>
+        <div class="ln"><span>FRESH</span><span>{{ totals.medium }}</span></div>
+        <div class="ln"><span>COOLING RACK</span><span>{{ totals.low }}</span></div>
+        {% if busiest_area or new_ingredient %}
+        <hr>
+        {% if busiest_area %}
+        {% set busiest_count = areas_ticker | selectattr('label', 'equalto', busiest_area | upper) | map(attribute='count') | list | first | default(none) %}
+        <div class="ln"><span>BUSIEST OVEN</span><span>{{ busiest_area | upper }}{% if busiest_count %} ×{{ busiest_count }}{% endif %}</span></div>
+        {% endif %}
+        {% if new_ingredient %}<div class="ln"><span>NEW INGREDIENT</span><span>"{{ new_ingredient | upper }}"</span></div>{% endif %}
+        {% endif %}
+        <hr>
+        <p class="thanks">thank you — fresh batch every week</p>
+      </div>
+      <span class="stamp">WEEK IN REVIEW</span>
+    </div>
+  </section>
+
+  {% if areas_ticker %}
+  <!-- the pan: the week's areas on a loop -->
+  <div class="e3">
+    <div class="pan" aria-hidden="true">
+      <div class="pan-inner">
+        <div class="pan-track">
+          {{ ticker_spans(areas_ticker, totals) }}
+          {{ ticker_spans(areas_ticker, totals) }}
+        </div>
+      </div>
+    </div>
+    <p class="pan-label">a week's worth, tray by tray</p>
+  </div>
+  {% endif %}
+
+  <!-- the week in days -->
+  <section class="menu e4">
+    <nav class="case-nav">
+      {% if prev_week %}<a href="/weekly/{{ prev_week }}/" rel="prev">← {{ prev_week }}</a>{% endif %}
+      <a href="/weekly/">all weeks</a>
+      {% if next_week %}<a href="/weekly/{{ next_week }}/" rel="next">{{ next_week }} →</a>{% endif %}
+    </nav>
+    <div class="menu-head">
+      <h3>The Week in Days</h3>
+      <p>each morning's bake — tap a day for the full tray</p>
+    </div>
+    <div class="weekstrip">
+      {% for d in days %}
+      {% if d.rested %}
+      <span class="weekday rested">
+        <span class="dow">{{ d.dow }}</span>
+        <b class="dnum">{{ d.day }}</b>
+        <span class="ct">rested</span>
+      </span>
+      {% else %}
+      <a class="weekday baked" href="/daily/{{ d.date }}/">
+        {% if d.high %}<span class="tart" title="{{ d.high }} pineapple tart{{ 's' if d.high != 1 }}"></span>{% endif %}
+        <span class="dow">{{ d.dow }}</span>
+        <b class="dnum">{{ d.day }}</b>
+        <span class="ct">{{ d.total }} cookie{{ 's' if d.total != 1 }}</span>
+      </a>
+      {% endif %}
+      {% endfor %}
+    </div>
+    <p class="weekstrip-label">red dot = a pineapple tart came out that day</p>
+  </section>
+
+  {% if specials %}
+  <!-- the week's specials board -->
+  <section class="board e5">
+    <div class="board-head">
+      <h3>This Week's Specials</h3>
+      <span class="rule"></span>
+      <span class="n">the pineapple tarts — the signals worth acting on</span>
+    </div>
+    {% for s in specials %}
+    <article class="special">
+      <div class="no">{{ '%02d' | format(loop.index) }}<small>{{ s.day_label }} · {{ kind_glyph(s.kind) }} {{ 'JUDGMENT' if s.kind == 'judgment' else 'NEWS' }}</small></div>
+      <div>
+        <h4>{{ s.headline }}</h4>
+        <p class="sum">{{ s.summary }}</p>
+        {% if s.why_it_matters %}<p class="why"><b>Why it matters</b>{{ s.why_it_matters }}</p>{% endif %}
+      </div>
+      <div class="side">
+        <span class="kind">{{ s.source_label | upper }}</span>
+        <a class="go" href="{{ s.source_url }}" target="_blank" rel="noopener">READ {{ 'JUDGMENT' if s.kind == 'judgment' else 'SOURCE' }} ↗</a>
+      </div>
+    </article>
+    {% endfor %}
+    {% if specials_extra %}
+    <p class="board-more">+ {{ specials_extra }} more pineapple tart{{ 's' if specials_extra != 1 }} this week — find them in <a href="/weekly/">the daily trays</a>.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if ovens or doctrine %}
+  <!-- patterns: busiest ovens + recurring doctrine -->
+  <section class="menu e6">
+    <div class="menu-head">
+      <h3>What Rose to the Top</h3>
+      <p>the areas and doctrine that ran through the week — see them spread on the <a class="kuih" href="/counter-map/">counter map</a></p>
+    </div>
+    <div class="menu-cols">
+      {% if ovens %}
+      <div class="menu-sec">
+        <div class="menu-area">Busiest Ovens <em>areas of law</em></div>
+        {% for o in ovens %}
+        <a class="mi" href="/counter-map/">
+          <span class="g">○</span><span class="h">{{ o.label }}</span><span class="dots"></span><span class="src">×{{ o.count }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if doctrine %}
+      <div class="menu-sec">
+        <div class="menu-area">Recurring Doctrine <em>shared this week</em></div>
+        {% for c in doctrine %}
+        <a class="mi" href="/counter-map/">
+          <span class="g">◆</span><span class="h">{{ c.label }}</span><span class="dots"></span><span class="src">×{{ c.count }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+{% endblock %}

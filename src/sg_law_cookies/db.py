@@ -476,6 +476,23 @@ def cookies_for_date(conn: sqlite3.Connection, day: date) -> list[Cookie]:
     return [_row_to_cookie(conn, row) for row in rows]
 
 
+def cookies_for_week(conn: sqlite3.Connection, monday: date) -> list[Cookie]:
+    """All cookies published in the 7-day week beginning `monday`, oldest first.
+
+    Day grouping uses publication date (see _PUB_DATE_SQL); the upper bound is
+    exclusive. Includes duplicate-flagged cookies; filtering is left to the
+    caller.
+    """
+    start = monday.isoformat()
+    end = (monday + timedelta(days=7)).isoformat()  # exclusive
+    rows = conn.execute(
+        f"SELECT * FROM cookies WHERE {_PUB_DATE_SQL} >= ? AND {_PUB_DATE_SQL} < ? "
+        "ORDER BY created_at, id",
+        (start, end),
+    ).fetchall()
+    return [_row_to_cookie(conn, row) for row in rows]
+
+
 def sources_for_cookies(
     conn: sqlite3.Connection, cookie_ids: list[str]
 ) -> dict[str, list[Source]]:

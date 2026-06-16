@@ -148,17 +148,20 @@ def test_build_writes_expected_files(built):
     out, report = built
     for rel in (
         "index.html",
-        "d/2026-06-11/index.html",
-        "d/2026-06-10/index.html",
-        "d/index.html",
+        "daily/2026-06-11/index.html",
+        "daily/2026-06-10/index.html",
+        "daily/index.html",
+        "weekly/2026-W24/index.html",
+        "weekly/index.html",
         "about/index.html",
         "feed.xml",
         "static/site.css",
     ):
         assert (out / rel).exists(), rel
     assert report.dates == ["2026-06-11", "2026-06-10"]
-    # 2 daily pages + homepage + archive + about + feed + counter map
-    assert report.pages == 7
+    # 2 daily pages + homepage + archive + weekly bake + weekly index
+    # + about + feed + counter map
+    assert report.pages == 9
 
 
 def test_index_attribution_disclaimer_and_source_links(built):
@@ -180,13 +183,16 @@ def test_no_read_source_anchor_points_at_zeeker(built):
         hrefs = re.findall(r'href="([^"]+)"', html)
         for href in hrefs:
             if "data.zeeker.sg" in href:
-                # the only zeeker link allowed is the bare attribution link
-                assert href.rstrip("/") == "https://data.zeeker.sg", (page, href)
+                # the only zeeker link allowed is the attribution link
+                assert href.rstrip("/") == "https://data.zeeker.sg?ref=cookies", (
+                    page,
+                    href,
+                )
 
 
 def test_daily_page_content(built):
     out, _ = built
-    html = (out / "d" / "2026-06-11" / "index.html").read_text()
+    html = (out / "daily" / "2026-06-11" / "index.html").read_text()
     assert "CA resets the test for wrongful dismissal" in html  # specials
     assert "Today&#39;s Specials" in html or "Today's Specials" in html
     assert "EMPLOYMENT LAW" in html                              # ticker/busiest
@@ -195,12 +201,12 @@ def test_daily_page_content(built):
     assert "[2026] SGCA 17" in html                              # judgment label
     assert "General" in html                                     # area-less medium group
     assert "civil procedure (1)" in html                         # rack breakdown
-    assert 'href="/d/2026-06-10/"' in html                       # prev nav
+    assert 'href="/daily/2026-06-10/"' in html                   # prev nav
 
 
 def test_no_high_sig_day_has_no_specials_board(built):
     out, _ = built
-    html = (out / "d" / "2026-06-10" / "index.html").read_text()
+    html = (out / "daily" / "2026-06-10" / "index.html").read_text()
     assert "Specials" not in html
     assert 'class="board' not in html
 
@@ -225,15 +231,15 @@ def test_empty_db_builds_warming_up_homepage(conn, tmp_path):
     assert "data.zeeker.sg" in html
     assert "not legal advice" in html
     assert (out / "feed.xml").exists()
-    assert (out / "d" / "index.html").exists()
+    assert (out / "daily" / "index.html").exists()
     assert report.warnings
 
 
 def test_archive_lists_days(built):
     out, _ = built
-    html = (out / "d" / "index.html").read_text()
-    assert 'href="/d/2026-06-11/"' in html
-    assert 'href="/d/2026-06-10/"' in html
+    html = (out / "daily" / "index.html").read_text()
+    assert 'href="/daily/2026-06-11/"' in html
+    assert 'href="/daily/2026-06-10/"' in html
     assert "Thursday, 11 June 2026" in html
 
 
@@ -274,5 +280,5 @@ def test_cli_build_prints_page_count(populated, tmp_path, monkeypatch, capsys):
     rc = cli.main(["build", "--out", str(out), "--base-url", BASE_URL])
     assert rc == 0
     captured = capsys.readouterr()
-    assert "built 7 pages" in captured.out
+    assert "built 9 pages" in captured.out
     assert (out / "index.html").exists()

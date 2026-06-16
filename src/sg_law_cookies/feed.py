@@ -71,7 +71,7 @@ def build_feed(conn: sqlite3.Connection, base_url: str) -> dict:
             # ORIGINAL document URL of the first source — never Zeeker (PRD §2.5).
             link = cookie_sources[0].source_url
         else:
-            link = f"{base}/d/{cookie.created_at.date().isoformat()}/"
+            link = f"{base}/daily/{cookie.created_at.date().isoformat()}/"
         entries.append(
             {
                 "title": cookie.headline,

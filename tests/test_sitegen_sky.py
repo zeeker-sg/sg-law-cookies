@@ -256,7 +256,7 @@ def test_counter_map_page_vendored_d3_no_cdn(built):
 
 def test_nav_doorway_on_every_page(built):
     out, _ = built
-    for rel in ("index.html", "counter-map/index.html", "d/2026-06-11/index.html"):
+    for rel in ("index.html", "counter-map/index.html", "daily/2026-06-11/index.html"):
         html = (out / rel).read_text()
         assert 'href="/counter-map/"' in html, rel
         assert "Counter Map" in html, rel

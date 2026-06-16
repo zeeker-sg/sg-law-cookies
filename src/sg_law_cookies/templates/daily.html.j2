@@ -72,8 +72,8 @@
   <section class="case e4">
     {% if prev_date or next_date %}
     <nav class="case-nav">
-      {% if prev_date %}<a href="/d/{{ prev_date }}/" rel="prev">← {{ prev_date }}</a>{% endif %}
-      {% if next_date %}<a href="/d/{{ next_date }}/" rel="next">{{ next_date }} →</a>{% endif %}
+      {% if prev_date %}<a href="/daily/{{ prev_date }}/" rel="prev">← {{ prev_date }}</a>{% endif %}
+      {% if next_date %}<a href="/daily/{{ next_date }}/" rel="next">{{ next_date }} →</a>{% endif %}
     </nav>
     {% endif %}
     {% if tray %}
@@ -153,8 +153,8 @@
         <span class="rackdots">{% for _ in range([rack.count, 6] | min) %}<i></i>{% endfor %}</span>
         <span><b>{{ rack.count }}</b> on the cooling rack{% if rack.breakdown %} — {{ rack.breakdown }}{% endif %}</span>
       </summary>
-      <p>Day-old cookies don't get thrown out. They keep in the <a href="/d/">archive</a>, and patterns
-      rise out of them in the weekly bake.</p>
+      <p>Day-old cookies don't get thrown out. They keep in the <a href="/daily/">archive</a>, and patterns
+      rise out of them in the <a href="{{ week_url }}">weekly bake</a>.</p>
     </details>
     {% endif %}
   </section>

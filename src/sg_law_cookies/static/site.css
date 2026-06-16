@@ -391,6 +391,26 @@ footer { margin-top: 60px; }
 .case-nav { display: flex; justify-content: flex-end; gap: 18px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; padding: 0 4px 8px; }
 .case-nav a { color: var(--color-text-muted); text-decoration: none; }
 .case-nav a:hover { color: var(--color-accent); }
+/* weekly bake: the week-in-days tray of seven day tiles */
+.weekstrip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin: 6px 0 4px; }
+.weekday {
+  position: relative; display: block; text-align: center; text-decoration: none;
+  padding: 11px 4px 9px; border-radius: 3px;
+  background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text);
+}
+.weekday .dow { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-muted); }
+.weekday .dnum { display: block; font-size: 23px; font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; }
+.weekday .ct { font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; color: var(--shop-red); }
+.weekday.baked { background: linear-gradient(180deg, #FAEA92, var(--pricecard)); border-color: var(--pricecard-edge); box-shadow: 0 6px 14px -10px rgba(20, 32, 31, 0.4); }
+.weekday.baked:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.weekday.rested { border-style: dashed; }
+.weekday.rested .dnum, .weekday.rested .ct { color: var(--color-text-muted); font-weight: 400; }
+.weekday .tart { position: absolute; top: 6px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--shop-red); box-shadow: 0 0 0 2px rgba(255,255,255,0.7); }
+.weekstrip-label { text-align: center; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-muted); padding-top: 10px; }
+.board-more { margin-top: 22px; padding-top: 18px; border-top: 1px dashed rgba(245, 242, 234, 0.18); font-size: 13.5px; font-style: italic; color: rgba(245, 242, 234, 0.7); }
+.board-more a { color: var(--dough); }
+@media (max-width: 880px) { .weekday .dnum { font-size: 18px; } .weekday { padding: 8px 2px 7px; } }
+
 /* about page prose */
 .about { margin-top: 44px; }
 .about-body { max-width: 68ch; margin: 0 auto; }

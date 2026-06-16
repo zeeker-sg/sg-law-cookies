@@ -83,12 +83,12 @@ def _url_and_src(
     conn: sqlite3.Connection, sources: list[Source], day: date
 ) -> tuple[str, str]:
     """(url, src) from the first source; sourceless mirrors sitegen's
-    day-page fallback (url=/d/<date>/, label COOKIES)."""
+    day-page fallback (url=/daily/<date>/, label COOKIES)."""
     # Lazy import: sitegen imports skydata at module level.
     from sg_law_cookies.sitegen import source_label
 
     if not sources:
-        return f"/d/{day.isoformat()}/", "COOKIES"
+        return f"/daily/{day.isoformat()}/", "COOKIES"
     first = sources[0]
     src = source_label(first)
     if first.item_type == "judgment":

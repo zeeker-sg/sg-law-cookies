@@ -399,7 +399,7 @@ def test_v2_news_cookie_has_no_issues_key(populated):
 def test_v2_sourceless_cookie_falls_back_to_day_page(populated):
     sky = build_sky_day(populated, DAY)
     entry = _entry(sky, "General", "Area-less")
-    assert entry["url"] == "/d/2026-06-11/"
+    assert entry["url"] == "/daily/2026-06-11/"
     assert entry["src"] == "COOKIES"
     assert entry["concepts"] == []
     assert "issues" not in entry

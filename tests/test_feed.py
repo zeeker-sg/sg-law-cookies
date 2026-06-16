@@ -156,4 +156,4 @@ def test_entry_without_sources_falls_back_to_day_page(conn):
     )
     db.save_cookie(conn, cookie)
     feed = build_feed(conn, BASE_URL)
-    assert feed["entries"][0]["link"] == f"{BASE_URL}/d/2026-06-11/"
+    assert feed["entries"][0]["link"] == f"{BASE_URL}/daily/2026-06-11/"

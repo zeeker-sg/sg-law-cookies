@@ -1,0 +1,26 @@
+{% extends "base.html.j2" %}
+{# Weekly index: dot-leader list of weekly bakes, reusing the menu styles. #}
+
+{% block title %}Weekly Bakes — SG Law Cookies{% endblock %}
+
+{% block content %}
+  <section class="menu e2">
+    <div class="menu-head">
+      <h3>The Bake Book</h3>
+      <p>every week on record — the patterns that rose out of each batch</p>
+    </div>
+    {% if weeks %}
+    <div class="menu-cols">
+      <div class="menu-sec">
+        {% for w in weeks %}
+        <a class="mi" href="/weekly/{{ w.key }}/">
+          <span class="g">▦</span><span class="h">{{ w.label }} · {{ w.year }} <em style="font-style:italic;color:var(--color-text-muted)">{{ w.range_display }}</em></span><span class="dots"></span><span class="src">{{ w.total }} COOKIE{{ 'S' if w.total != 1 }}{% if w.high %} · {{ w.high }} TART{{ 'S' if w.high != 1 }}{% endif %}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <p class="case-note">No full weeks on record yet — the oven's warming up.</p>
+    {% endif %}
+  </section>
+{% endblock %}

@@ -13,7 +13,7 @@
     <div class="menu-cols">
       <div class="menu-sec">
         {% for d in days %}
-        <a class="mi" href="/d/{{ d.date }}/">
+        <a class="mi" href="/daily/{{ d.date }}/">
           <span class="g">○</span><span class="h">{{ d.date_long }}</span><span class="dots"></span><span class="src">{{ d.total }} COOKIE{{ 'S' if d.total != 1 }}{% if d.high %} · {{ d.high }} TART{{ 'S' if d.high != 1 }}{% endif %}</span>
         </a>
         {% endfor %}
