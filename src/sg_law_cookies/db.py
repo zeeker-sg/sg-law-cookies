@@ -439,23 +439,38 @@ def get_daily_stats(conn: sqlite3.Connection, day: date) -> DailyStats | None:
 # ── site read queries (sitegen / feed) ───────────────────────────────
 
 
+# A cookie is filed under its PUBLICATION date — the earliest document date
+# across its sources (judgment decision_date, article published_date), not the
+# date we processed it. Sourceless cookies fall back to their processing date so
+# they still land on a page. Source dates are ISO 'YYYY-MM-DD' TEXT, so MIN()
+# and string comparison sort chronologically.
+_PUB_DATE_SQL = (
+    "COALESCE("
+    "(SELECT MIN(s.date) FROM sources s "
+    "JOIN cookie_sources cs ON cs.source_id = s.id "
+    "WHERE cs.cookie_id = cookies.id), "
+    "date(cookies.created_at))"
+)
+
+
 def list_cookie_dates(conn: sqlite3.Connection) -> list[str]:
-    """Distinct ISO days (date(created_at)) that have cookies, newest first."""
+    """Distinct publication days that have cookies, newest first."""
     return [
         row["day"]
         for row in conn.execute(
-            "SELECT DISTINCT date(created_at) AS day FROM cookies ORDER BY day DESC"
+            f"SELECT DISTINCT {_PUB_DATE_SQL} AS day FROM cookies ORDER BY day DESC"
         )
     ]
 
 
 def cookies_for_date(conn: sqlite3.Connection, day: date) -> list[Cookie]:
-    """All cookies created on the given day, oldest first.
+    """All cookies published on the given day, oldest first (by processing time).
 
+    "Published" = the earliest source document date (see _PUB_DATE_SQL).
     Includes duplicate-flagged cookies; filtering is left to the caller.
     """
     rows = conn.execute(
-        "SELECT * FROM cookies WHERE date(created_at) = ? ORDER BY created_at, id",
+        f"SELECT * FROM cookies WHERE {_PUB_DATE_SQL} = ? ORDER BY created_at, id",
         (day.isoformat(),),
     ).fetchall()
     return [_row_to_cookie(conn, row) for row in rows]

@@ -54,8 +54,6 @@ def _source(**overrides) -> Source:
 
 
 def _cookie(conn, source: Source | None, **overrides) -> Cookie:
-    if source is not None:
-        db.upsert_source(conn, source)
     defaults = dict(
         headline="A headline",
         summary="A summary.",
@@ -68,6 +66,12 @@ def _cookie(conn, source: Source | None, **overrides) -> Cookie:
     )
     defaults.update(overrides)
     cookie = Cookie(**defaults)
+    # Publication date = MIN(sources.date); align the source's document date to
+    # the cookie's created_at day so the cookie files under the day the test
+    # intends (created_at encodes it). Sourceless cookies fall back to created_at.
+    if source is not None:
+        source = source.model_copy(update={"date": cookie.created_at.date()})
+        db.upsert_source(conn, source)
     db.save_cookie(conn, cookie)
     return cookie
 
