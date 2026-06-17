@@ -78,6 +78,7 @@ body { background: var(--color-bg); color: var(--color-text); font-family: var(-
   position: relative;
 }
 .sign-left { display: flex; align-items: center; gap: 20px; }
+.sign-home { display: flex; align-items: center; gap: 20px; text-decoration: none; color: inherit; }
 .crumb-logo {
   width: 52px; height: 52px; flex: none; position: relative;
   border-radius: 50% 46% 52% 48% / 48% 52% 46% 52%;
