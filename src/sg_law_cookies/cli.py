@@ -101,8 +101,19 @@ def _cmd_deactivate(args: argparse.Namespace, settings: Settings) -> int:
     return _set_active(args, settings, active=False)
 
 
-def _build_llm(settings: Settings) -> AnthropicBackend | OllamaBackend | None:
+def _build_llm(settings: Settings, pipeline: str = "news") -> AnthropicBackend | OllamaBackend | None:
+    """Build an LLMBackend appropriate for the given pipeline.
+
+    When dual_ollama is enabled and a judgment-specific host/model is
+    configured, the judgment pipeline uses that backend; everything else
+    falls back to the default ollama host/model.
+    """
     if settings.llm_backend == "ollama":
+        if settings.dual_ollama and pipeline == "judgment" and settings.judgment_ollama_host:
+            return OllamaBackend(
+                model=settings.judgment_ollama_model or settings.ollama_model,
+                host=settings.judgment_ollama_host,
+            )
         return OllamaBackend(model=settings.ollama_model, host=settings.ollama_host)
     if settings.llm_backend != "anthropic":
         print(f"error: unknown COOKIES_LLM_BACKEND {settings.llm_backend!r}", file=sys.stderr)
@@ -124,7 +135,10 @@ def _cmd_run(args: argparse.Namespace, settings: Settings) -> int:
     zeeker_client = ZeekerClient()
     llm = None
     if not args.dry_run:
-        llm = _build_llm(settings)
+        # Determine pipeline type from source to choose the right LLM backend
+        zeeker_db, _, table = args.source.partition("/")
+        pipeline = item_type_for(table)
+        llm = _build_llm(settings, pipeline=pipeline)
         if llm is None:
             return 1
 
@@ -169,7 +183,7 @@ def _cmd_backfill_areas(args: argparse.Namespace, settings: Settings) -> int:
     from sg_law_cookies.backfill import backfill_areas
 
     conn = db.init_db(settings.db_path)
-    llm = _build_llm(settings)
+    llm = _build_llm(settings, pipeline="news")
     if llm is None:
         return 1
 
