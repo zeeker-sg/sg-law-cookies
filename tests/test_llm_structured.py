@@ -252,19 +252,22 @@ def test_ollama_structured_non_json_raises():
 
 
 @respx.mock
-def test_ollama_structured_non_object_json_raises():
+def test_ollama_structured_accepts_bare_array():
+    # format=schema is not reliably enforced by all models; some return a bare
+    # array instead of the object. structured() returns it as-is and leaves the
+    # shape to the caller (see OllamaBackend.structured).
     respx.post("http://localhost:11434/api/chat").mock(
         return_value=httpx.Response(200, json=_ollama_response([1, 2, 3]))
     )
     backend = OllamaBackend(client=httpx.Client())
 
-    with pytest.raises(ExtractionError, match="non-object"):
-        backend.structured(
-            system="s",
-            user="u",
-            schema=JUDGMENT_ISSUE_SUMMARY_TOOL["input_schema"],
-            tool_name="record_issue_summary",
-        )
+    result = backend.structured(
+        system="s",
+        user="u",
+        schema=JUDGMENT_ISSUE_SUMMARY_TOOL["input_schema"],
+        tool_name="record_issue_summary",
+    )
+    assert result == [1, 2, 3]
 
 
 # ── Judgment prompt/schema sanity ─────────────────────────────────────
