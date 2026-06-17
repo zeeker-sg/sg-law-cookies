@@ -208,6 +208,21 @@ def _cmd_build(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _cmd_restore(args: argparse.Namespace, settings: Settings) -> int:
+    from sg_law_cookies.backup import BackupError, restore_db
+
+    try:
+        result = restore_db(settings.db_path)
+    except BackupError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(
+        f"restored s3://{result.bucket}/{result.key} "
+        f"({result.size_bytes:,} bytes) -> {result.db_path}"
+    )
+    return 0
+
+
 def _cmd_backup(args: argparse.Namespace, settings: Settings) -> int:
     from sg_law_cookies.backup import BackupError, backup_db
 
@@ -299,6 +314,12 @@ def build_parser() -> argparse.ArgumentParser:
         "backup", help="snapshot the database and upload to S3 (env: S3_BUCKET, AWS keys)"
     )
     backup_p.set_defaults(func=_cmd_backup)
+
+    restore_p = sub.add_parser(
+        "restore",
+        help="download the canonical DB from S3, replacing the local one (env: S3_BUCKET, AWS keys)",
+    )
+    restore_p.set_defaults(func=_cmd_restore)
 
     return parser
 

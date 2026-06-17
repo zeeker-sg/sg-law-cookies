@@ -7,6 +7,7 @@ means "publish to data.zeeker.sg".
 """
 
 import os
+import shutil
 import sqlite3
 import tempfile
 from dataclasses import dataclass
@@ -25,6 +26,14 @@ class BackupResult:
     bucket: str
     dated_key: str
     latest_key: str
+    size_bytes: int
+
+
+@dataclass
+class RestoreResult:
+    bucket: str
+    key: str
+    db_path: Path
     size_bytes: int
 
 
@@ -96,3 +105,37 @@ def backup_db(
         client.upload_file(str(snap), bucket, dated_key)
         client.upload_file(str(snap), bucket, latest_key)
     return BackupResult(bucket=bucket, dated_key=dated_key, latest_key=latest_key, size_bytes=size)
+
+
+def restore_db(
+    db_path: Path,
+    bucket: str | None = None,
+    s3_client=None,
+    key: str | None = None,
+) -> RestoreResult:
+    """Download the canonical snapshot from S3 and atomically replace db_path.
+
+    The mirror of backup_db: pulls backups/sg-law-cookies/latest.db so a fresh
+    or stale host continues from canonical state instead of re-forking. Stale
+    WAL sidecars are removed first — applying them to the replaced file would
+    corrupt it.
+    """
+    bucket = bucket or os.getenv("S3_BUCKET")
+    if not bucket:
+        raise BackupError("S3_BUCKET is required (set it in .env)")
+    client = s3_client or _make_client()
+    key = key or f"{BACKUP_PREFIX}/latest.db"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        dl = Path(tmp) / "latest.db"
+        try:
+            client.download_file(bucket, key, str(dl))
+        except Exception as exc:  # noqa: BLE001 — surface a clear message for any S3/botocore error
+            raise BackupError(f"could not download s3://{bucket}/{key}: {exc}") from exc
+        size = dl.stat().st_size
+        db_path = Path(db_path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        for sidecar in (f"{db_path}-wal", f"{db_path}-shm"):
+            Path(sidecar).unlink(missing_ok=True)
+        shutil.move(str(dl), str(db_path))
+    return RestoreResult(bucket=bucket, key=key, db_path=db_path, size_bytes=size)
