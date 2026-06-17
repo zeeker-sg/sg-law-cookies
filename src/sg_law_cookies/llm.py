@@ -111,10 +111,22 @@ class OllamaBackend:
             schema=NEWS_EXTRACTION_TOOL["input_schema"],
             tool_name=NEWS_EXTRACTION_TOOL["name"],
         )
-        topics = data.get("topics")
+        # Some Ollama models return {"topics": [...]} as instructed,
+        # others return the array directly. Accept both.
+        topics = data.get("topics") if isinstance(data, dict) else data
         if not isinstance(topics, list):
-            raise ExtractionError(f"Ollama response missing 'topics' list: {data!r}")
-        return [TopicExtraction.model_validate(topic) for topic in topics]
+            raise ExtractionError(
+                f"Ollama response missing 'topics' list: got {type(data).__name__} {data!r}"
+            )
+        # Normalize: some models return comma-separated strings instead of lists
+        normalized = []
+        for topic in topics:
+            for key in ("raw_areas", "raw_entities", "raw_concepts"):
+                val = topic.get(key)
+                if isinstance(val, str):
+                    topic[key] = [v.strip() for v in val.split(",") if v.strip()]
+            normalized.append(topic)
+        return [TopicExtraction.model_validate(topic) for topic in normalized]
 
     def structured(
         self,
@@ -144,13 +156,24 @@ class OllamaBackend:
             payload["think"] = self.think
         response = self.client.post(f"{self.host}/api/chat", json=payload)
         response.raise_for_status()
-        content = response.json().get("message", {}).get("content", "")
+        raw = response.json().get("message", {}).get("content", "")
+        # Strip markdown code fences that some models wrap the JSON in
+        content = raw
+        if content.startswith("```json"):
+            content = content[7:]
+        elif content.startswith("```"):
+            content = content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        content = content.strip()
         try:
             data = json.loads(content)
         except json.JSONDecodeError as exc:
-            raise ExtractionError(f"Ollama returned non-JSON content: {content[:200]!r}") from exc
-        if not isinstance(data, dict):
-            raise ExtractionError(f"Ollama returned non-object JSON: {data!r}")
+            raise ExtractionError(
+                f"Ollama returned non-JSON content: {raw[:200]!r}"
+            ) from exc
+        # Ollama's format=schema is not reliably enforced by all models;
+        # some return a bare array instead of an object. Accept both.
         return data
 
 
