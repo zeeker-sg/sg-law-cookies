@@ -1,8 +1,11 @@
 """FOLIO ontology resolution (PRD section 4.3, pseudocode section 4).
 
-Uses the hosted FOLIO REST API at folio.openlegalstandard.org:
+Areas of law are no longer resolved here: the extraction LLM selects them from
+the closed FOLIO vocabulary (area_vocab) and resolve_topic pass 1 maps the label
+to its IRI directly. Entities, concepts and judgment metadata still resolve
+against the hosted FOLIO REST API at folio.openlegalstandard.org:
 
-- GET /search/query?label=<q>&branch=area_of_law  — branch-filtered substring
+- GET /search/query?label=<q>&branch=<branch>  — branch-filtered substring
   search, returns {"classes": [...]} with no relevance scores.
 - GET /search/label?query=<q>  — fuzzy search across all branches, returns
   {"results": [[OWLClass, score], ...]} with scores on a 0-100 scale. The
@@ -17,13 +20,13 @@ from __future__ import annotations
 import httpx
 from pydantic import BaseModel
 
+from sg_law_cookies.area_vocab import AREA_IRI_BY_LABEL
 from sg_law_cookies.models import FolioRef, JudgmentMeta, TopicExtraction
 from sg_law_cookies.sg_mappings import lookup_sg_entity
 
 FOLIO_API_BASE = "https://folio.openlegalstandard.org"
 CONFIDENCE_THRESHOLD = 0.6
 AREAS_OF_LAW_BRANCH = "areas_of_law"  # branch label stored on FolioRef
-_AREAS_QUERY_BRANCH = "area_of_law"  # branch filter value for /search/query
 _SEARCH_LIMIT = 20
 
 
@@ -61,33 +64,6 @@ def _is_leaf(cls: dict) -> bool | None:
     if children is None:
         return None
     return len(children) == 0
-
-
-def _search_areas(client: httpx.Client, query: str) -> list[SearchResult]:
-    key = (query.lower(), _AREAS_QUERY_BRANCH)
-    if key in _search_cache:
-        return _search_cache[key]
-    if len(query.strip()) < 2:
-        _search_cache[key] = []
-        return []
-    try:
-        resp = client.get(
-            f"{FOLIO_API_BASE}/search/query",
-            params={"label": query, "branch": _AREAS_QUERY_BRANCH, "limit": _SEARCH_LIMIT},
-        )
-        resp.raise_for_status()
-        classes = resp.json().get("classes", [])
-    except (httpx.HTTPError, ValueError):
-        # An API failure must not kill the run — the term lands in
-        # `unresolved` and can be re-resolved later (PRD 4.3, 8.2).
-        return []
-    results = [
-        SearchResult(iri=cls["iri"], label=cls["label"], is_leaf=_is_leaf(cls))
-        for cls in classes
-        if cls.get("iri") and cls.get("label")
-    ]
-    _search_cache[key] = results
-    return results
 
 
 def _search_all_branches(client: httpx.Client, query: str) -> list[SearchResult]:
@@ -173,16 +149,23 @@ def pick_best_match(
 def resolve_topic(topic: TopicExtraction, client: httpx.Client) -> TopicExtraction:
     """Resolve a topic's free-text labels to FOLIO IRIs (three passes)."""
 
-    # Pass 1: areas of law, constrained to the areas-of-law branch.
+    # Pass 1: areas of law. The model selects from the closed FOLIO area
+    # vocabulary (area_vocab.AREA_LABELS), so resolution is an exact-label
+    # lookup with no network call. An unknown label (e.g. a backend ignoring
+    # the schema enum) degrades to unresolved.
+    seen_areas: set[str] = set()
     for raw_area in topic.raw_areas:
-        best = pick_best_match(_search_areas(client, raw_area), raw_area)
-        if best:
+        if raw_area in seen_areas:
+            continue
+        seen_areas.add(raw_area)
+        iri = AREA_IRI_BY_LABEL.get(raw_area)
+        if iri is not None:
             topic.folio_areas.append(
                 FolioRef(
-                    iri=best.iri,
-                    preferred_label=best.label,
+                    iri=iri,
+                    preferred_label=raw_area,
                     branch=AREAS_OF_LAW_BRANCH,
-                    confidence=best.score,
+                    confidence=1.0,
                 )
             )
         else:

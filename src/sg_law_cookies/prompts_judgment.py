@@ -539,8 +539,11 @@ For each topic:
   reasoning or test applied.
 - why_it_matters: exactly one sentence on the practical implication for
   a Singapore lawyer.
-- raw_areas: free-text areas of law engaged (e.g. "data protection",
-  "company law"). A later step normalises these against FOLIO.
+- raw_areas: the areas of law engaged, chosen ONLY from the fixed list of
+  labels offered in the record_topics tool's raw_areas field (the FOLIO
+  area-of-law taxonomy). Pick the most specific applicable label(s); the
+  taxonomy is US-derived, so map the Singapore concept to its nearest
+  equivalent. Return an empty list rather than forcing a poor match.
 - raw_entities: free-text names of the court or regulator, parties,
   statutes and other entities involved.
 - raw_concepts: free-text legal doctrines, principles or concepts engaged.

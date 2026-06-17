@@ -165,6 +165,40 @@ def _cmd_stats(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _cmd_backfill_areas(args: argparse.Namespace, settings: Settings) -> int:
+    from sg_law_cookies.backfill import backfill_areas
+
+    conn = db.init_db(settings.db_path)
+    llm = _build_llm(settings)
+    if llm is None:
+        return 1
+
+    def _progress(i, total, cookie, old, new):
+        shown = "FAILED" if new is None else (new or ["(none)"])
+        print(f"[{i + 1}/{total}] {old or ['General']} -> {shown}  {cookie.headline[:60]}")
+
+    report = backfill_areas(
+        conn,
+        llm,
+        only_general=args.only_general,
+        news_only=args.news_only,
+        dry_run=args.dry_run,
+        progress=_progress,
+    )
+
+    verb = "would change" if args.dry_run else "changed"
+    print(
+        f"\n{report.considered}/{report.total} considered; {verb} {report.changed} "
+        f"(+{report.now_tagged} newly tagged, -{report.now_empty} now empty, "
+        f"{report.failed} failed)"
+    )
+    if not args.dry_run and report.changed:
+        for day_iso in db.list_cookie_dates(conn):
+            db.save_daily_stats(conn, db.compute_daily_stats(conn, date.fromisoformat(day_iso)))
+        print(f"recomputed daily stats for {len(db.list_cookie_dates(conn))} days")
+    return 0
+
+
 def _cmd_build(args: argparse.Namespace, settings: Settings) -> int:
     conn = db.init_db(settings.db_path)
     report = build_site(conn, Path(args.out), args.base_url)
@@ -232,6 +266,25 @@ def build_parser() -> argparse.ArgumentParser:
     stats_p = sub.add_parser("stats", help="compute and store daily stats")
     stats_p.add_argument("--date", help="YYYY-MM-DD (default: today)")
     stats_p.set_defaults(func=_cmd_stats)
+
+    backfill_p = sub.add_parser(
+        "backfill-areas",
+        help="re-tag existing cookies' areas of law with the closed-vocabulary classifier",
+    )
+    backfill_p.add_argument(
+        "--only-general",
+        action="store_true",
+        help="only re-tag cookies that currently have no area (render as General)",
+    )
+    backfill_p.add_argument(
+        "--news-only",
+        action="store_true",
+        help="only re-tag cookies with a news source (skip judgments)",
+    )
+    backfill_p.add_argument(
+        "--dry-run", action="store_true", help="show changes without writing them"
+    )
+    backfill_p.set_defaults(func=_cmd_backfill_areas)
 
     build_p = sub.add_parser("build", help="render the static site")
     build_p.add_argument("--out", default="./dist", help="output directory (default ./dist)")

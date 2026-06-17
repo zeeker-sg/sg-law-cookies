@@ -270,6 +270,23 @@ def get_cookie(conn: sqlite3.Connection, cookie_id: str) -> Cookie | None:
     return _row_to_cookie(conn, row) if row else None
 
 
+def all_cookies(conn: sqlite3.Connection) -> list[Cookie]:
+    """Every cookie, oldest first (used by maintenance tasks like backfills)."""
+    rows = conn.execute("SELECT * FROM cookies ORDER BY created_at").fetchall()
+    return [_row_to_cookie(conn, row) for row in rows]
+
+
+def update_cookie_areas(
+    conn: sqlite3.Connection, cookie_id: str, folio_areas: list[FolioRef]
+) -> None:
+    """Replace just a cookie's folio_areas, leaving every other field intact."""
+    conn.execute(
+        "UPDATE cookies SET folio_areas = ? WHERE id = ?",
+        (_dump_refs(folio_areas), cookie_id),
+    )
+    conn.commit()
+
+
 def find_recent_cookies(
     conn: sqlite3.Connection, lookback_days: int, as_of: date | None = None
 ) -> list[Cookie]:

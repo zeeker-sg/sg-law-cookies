@@ -9,6 +9,7 @@ from typing import Any
 
 import anthropic
 
+from sg_law_cookies.area_vocab import AREA_LABELS
 from sg_law_cookies.models import RawItem, TopicExtraction
 from sg_law_cookies.prompts import NEWS_SYSTEM_PROMPT
 
@@ -48,8 +49,13 @@ NEWS_EXTRACTION_TOOL: dict[str, Any] = {
                         },
                         "raw_areas": {
                             "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Free-text areas of law engaged.",
+                            "items": {"type": "string", "enum": AREA_LABELS},
+                            "description": (
+                                "Areas of law engaged, chosen from the FOLIO "
+                                "area-of-law taxonomy. Pick the most specific "
+                                "applicable label(s); return an empty list if "
+                                "none genuinely fit."
+                            ),
                         },
                         "raw_entities": {
                             "type": "array",

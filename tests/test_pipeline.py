@@ -51,7 +51,7 @@ def topic_dict(headline: str = "EP salary floor rises to SGD 6,000", **overrides
         "summary": "MOM will raise the EP qualifying salary. New applications from Jan 2027 are affected.",
         "why_it_matters": "Clients hiring foreign professionals must budget for the higher floor.",
         "significance": "high",
-        "raw_areas": ["Employment"],
+        "raw_areas": ["Employment Law"],
         "raw_entities": ["PDPC"],
         "raw_concepts": ["xyzzy doctrine"],
     }
@@ -143,7 +143,7 @@ def test_process_news_extracts_resolves_and_stores(conn):
     cookie = cookies[0]
     assert cookie.headline == "EP salary floor rises to SGD 6,000"
     assert cookie.significance == "high"
-    # area resolved via FOLIO (substring match >= threshold)
+    # area resolved via the closed FOLIO vocabulary (exact-label lookup)
     assert cookie.folio_areas[0].preferred_label == "Employment Law"
     assert cookie.folio_areas[0].branch == "areas_of_law"
     # entity resolved via local Singapore mapping, no API call

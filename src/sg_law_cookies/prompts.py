@@ -24,9 +24,13 @@ For each topic extract:
   affects, and any key figures, dates or thresholds stated in the article.
 - why_it_matters: exactly one sentence telling the lawyer why they should
   care or what they may need to do.
-- raw_areas: free-text areas of law engaged (e.g. "employment law",
-  "data protection"). Use natural phrasing; a later step normalises these
-  against the FOLIO ontology.
+- raw_areas: the areas of law engaged, chosen ONLY from the fixed list of
+  labels offered in the record_topics tool's raw_areas field (the FOLIO
+  area-of-law taxonomy). Pick the most specific applicable label(s). The
+  taxonomy is US-derived, so map the Singapore concept to its nearest
+  equivalent (e.g. autonomous-vehicle regulation -> "Transportation Law",
+  personal data protection -> "Privacy Law"). If no label genuinely fits,
+  return an empty list rather than forcing a poor match.
 - raw_entities: free-text names of organisations, courts, regulators,
   statutes and other entities involved.
 - raw_concepts: free-text legal doctrines, principles or concepts engaged

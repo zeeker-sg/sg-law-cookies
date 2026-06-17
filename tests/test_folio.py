@@ -5,6 +5,7 @@ import pytest
 import respx
 
 from sg_law_cookies import folio
+from sg_law_cookies.area_vocab import AREA_IRI_BY_LABEL
 from sg_law_cookies.folio import (
     FOLIO_API_BASE,
     SearchResult,
@@ -92,20 +93,38 @@ def test_pick_best_match_prefers_leaf_on_tie():
 
 
 @respx.mock
-def test_resolve_area_exact_match():
-    respx.get(f"{FOLIO_API_BASE}/search/query").respond(
-        json={"classes": [_owl_class("Employment Law", "R7H5")], "properties": []}
-    )
-    topic = _topic(raw_areas=["employment law"])
+def test_resolve_area_from_vocab_no_api_call():
+    # Areas come from the closed FOLIO vocabulary, so pass 1 is a dict lookup
+    # and must not touch the network.
+    route = respx.get(url__regex=rf"{FOLIO_API_BASE}/.*").respond(json={"classes": []})
+    topic = _topic(raw_areas=["Employment Law"])
     with httpx.Client() as client:
         resolve_topic(topic, client)
+    assert route.call_count == 0
     assert len(topic.folio_areas) == 1
     ref = topic.folio_areas[0]
-    assert ref.iri == f"{FOLIO_API_BASE}/R7H5"
+    assert ref.iri == AREA_IRI_BY_LABEL["Employment Law"]
     assert ref.preferred_label == "Employment Law"
     assert ref.branch == "areas_of_law"
     assert ref.confidence == 1.0
     assert topic.unresolved == []
+
+
+def test_resolve_area_unknown_label_goes_unresolved():
+    # A label outside the vocabulary (e.g. a backend ignoring the schema enum)
+    # degrades to unresolved rather than being stored.
+    topic = _topic(raw_areas=["employment law", "Made Up Law"])  # wrong case / not in set
+    with httpx.Client() as client:
+        resolve_topic(topic, client)
+    assert topic.folio_areas == []
+    assert topic.unresolved == ["employment law", "Made Up Law"]
+
+
+def test_resolve_area_dedupes_repeated_labels():
+    topic = _topic(raw_areas=["Tax Law", "Tax Law"])
+    with httpx.Client() as client:
+        resolve_topic(topic, client)
+    assert [r.preferred_label for r in topic.folio_areas] == ["Tax Law"]
 
 
 @respx.mock
@@ -187,32 +206,30 @@ def test_lookup_sg_entity_normalises_and_copies():
 
 @respx.mock
 def test_search_cache_avoids_repeat_api_calls():
-    route = respx.get(f"{FOLIO_API_BASE}/search/query").respond(
-        json={"classes": [_owl_class("Tax Law", "Rtax")], "properties": []}
+    route = respx.get(f"{FOLIO_API_BASE}/search/label").respond(
+        json={"results": [[_owl_class("Duty of Care", "Rdoc"), 100.0]]}
     )
-    topic_a = _topic(raw_areas=["Tax Law"])
-    topic_b = _topic(raw_areas=["tax law"])  # cache key is case-insensitive
+    respx.get(url__regex=rf"{FOLIO_API_BASE}/taxonomy/tree/path/.*").respond(
+        json=_path_payload("Objectives")
+    )
+    topic_a = _topic(raw_concepts=["Duty of Care"])
+    topic_b = _topic(raw_concepts=["duty of care"])  # cache key is case-insensitive
     with httpx.Client() as client:
         resolve_topic(topic_a, client)
         resolve_topic(topic_b, client)
     assert route.call_count == 1
-    assert topic_b.folio_areas[0].confidence == 1.0
+    assert topic_b.folio_concepts[0].confidence == 1.0
 
 
 # ── live ─────────────────────────────────────────────────────────
 
 
-@pytest.mark.live
-def test_live_resolve_employment_law():
+def test_resolve_area_iri_points_at_folio():
     topic = _topic(raw_areas=["Employment Law"])
-    with httpx.Client(timeout=30) as client:
+    with httpx.Client() as client:
         resolve_topic(topic, client)
-    assert len(topic.folio_areas) == 1
     ref = topic.folio_areas[0]
-    assert ref.preferred_label == "Employment Law"
-    assert ref.confidence == 1.0
     assert ref.iri and "openlegalstandard.org" in ref.iri
-    assert topic.unresolved == []
 
 
 # ── API failures degrade to unresolved, never crash the run ──────
