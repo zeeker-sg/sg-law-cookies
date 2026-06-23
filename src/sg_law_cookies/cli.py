@@ -31,7 +31,7 @@ def _cmd_discover(args: argparse.Namespace, settings: Settings) -> int:
     deliberate registry edit. Licence labels are refreshed on every run.
     """
     conn = db.init_db(settings.db_path)
-    client = ZeekerClient()
+    client = ZeekerClient(base_url=settings.zeeker_base_url)
     known = {(e.zeeker_db, e.table): e for e in db.list_registry(conn)}
     new_count = 0
     for entry in client.discover_catalogue():
@@ -132,7 +132,7 @@ def _build_llm(settings: Settings, pipeline: str = "news") -> AnthropicBackend |
 
 def _cmd_run(args: argparse.Namespace, settings: Settings) -> int:
     conn = db.init_db(settings.db_path)
-    zeeker_client = ZeekerClient()
+    zeeker_client = ZeekerClient(base_url=settings.zeeker_base_url)
     llm = None
     if not args.dry_run:
         # Determine pipeline type from source to choose the right LLM backend

@@ -107,6 +107,8 @@ class Structure:
 def _parse_structure(data: dict) -> Structure:
     issues = []
     for item in data.get("issues") or []:
+        if not isinstance(item, dict):
+            continue
         question = str(item.get("question", "")).strip()
         if not question:
             continue
@@ -121,6 +123,8 @@ def _parse_structure(data: dict) -> Structure:
         )
     cases = []
     for case in data.get("cases_cited") or []:
+        if not isinstance(case, dict):
+            continue
         citation = str(case.get("citation", "")).strip()
         if not citation:
             continue

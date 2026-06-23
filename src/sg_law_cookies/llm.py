@@ -137,19 +137,28 @@ class OllamaBackend:
         max_tokens: int = 16000,  # noqa: ARG002 — Anthropic-only knob, accepted for parity
         num_ctx: int | None = None,
     ) -> dict:
-        """One schema-constrained /api/chat call, returns the parsed JSON object.
+        """One LLM call, returns parsed JSON.
 
-        num_ctx defaults to 16k (news articles run 500-3,000 words plus prompt);
-        callers pass a larger value (e.g. 32768) for long judgment chunks.
+        Ollama's `format=schema` is unreliable with cloud-routed models and
+        even some local models emit YAML or text. We drop the schema constraint
+        from the payload and instead append a JSON-example instruction to the
+        system prompt. If the response still isn't valid JSON, we attempt a
+        repair call before giving up.
         """
+        example = json.dumps(schema, indent=2)
+        augmented_system = (
+            f"{system}\n\n"
+            f"Respond ONLY with a single JSON object matching this schema:\n"
+            f"{example}\n\n"
+            "Do not wrap in markdown code fences. Output raw JSON only."
+        )
         payload: dict = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": system},
+                {"role": "system", "content": augmented_system},
                 {"role": "user", "content": user},
             ],
             "stream": False,
-            "format": schema,
             "options": {"temperature": 0, "num_ctx": num_ctx or DEFAULT_NUM_CTX},
         }
         if self.think is not None:
@@ -157,7 +166,42 @@ class OllamaBackend:
         response = self.client.post(f"{self.host}/api/chat", json=payload)
         response.raise_for_status()
         raw = response.json().get("message", {}).get("content", "")
-        # Strip markdown code fences that some models wrap the JSON in
+        data = self._parse_json(raw, schema)
+        if data is not None:
+            return data
+
+        # Repair attempt: ask the model to fix its malformed output
+        repair_payload = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a JSON repair tool. Convert the user's text into valid JSON matching the requested schema. Output raw JSON only, no markdown fences.",
+                },
+                {
+                    "role": "user",
+                    "content": f"Schema:\n{example}\n\nText to convert:\n{raw[:4000]}",
+                },
+            ],
+            "stream": False,
+            "options": {"temperature": 0, "num_ctx": num_ctx or DEFAULT_NUM_CTX},
+        }
+        if self.think is not None:
+            repair_payload["think"] = self.think
+        repair_resp = self.client.post(f"{self.host}/api/chat", json=repair_payload)
+        repair_resp.raise_for_status()
+        repair_raw = repair_resp.json().get("message", {}).get("content", "")
+        data = self._parse_json(repair_raw, schema)
+        if data is not None:
+            return data
+
+        raise ExtractionError(
+            f"Ollama returned non-JSON content even after repair: {raw[:200]!r}"
+        )
+
+    @staticmethod
+    def _parse_json(raw: str, schema: dict) -> dict | None:
+        """Strip fences and parse; return None on failure."""
         content = raw
         if content.startswith("```json"):
             content = content[7:]
@@ -166,15 +210,14 @@ class OllamaBackend:
         if content.endswith("```"):
             content = content[:-3]
         content = content.strip()
+        if not content:
+            if schema.get("properties", {}).get("topics", {}).get("type") == "array":
+                return {"topics": []}
+            return None
         try:
-            data = json.loads(content)
-        except json.JSONDecodeError as exc:
-            raise ExtractionError(
-                f"Ollama returned non-JSON content: {raw[:200]!r}"
-            ) from exc
-        # Ollama's format=schema is not reliably enforced by all models;
-        # some return a bare array instead of an object. Accept both.
-        return data
+            return json.loads(content)
+        except json.JSONDecodeError:
+            return None
 
 
 def as_backend(llm: object, model: str = DEFAULT_MODEL) -> LLMBackend:
