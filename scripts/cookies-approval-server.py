@@ -100,8 +100,7 @@ def verify_discord_signature(body: bytes, signature: str, timestamp: str) -> boo
         )
         return True
     except Exception as exc:
-        if "BadSignatureError" in type(exc).__name__:
-            return False
+        print(f"Signature verification failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return False
 
 
@@ -374,10 +373,27 @@ class InteractionHandler(BaseHTTPRequestHandler):
         body = self.rfile.read(min(content_length, MAX_BODY))
 
         # Verify Discord signature
-        signature = self.headers.get("X-Ed25519-Signature", "")
+        # Cloudflare/Caddy may normalize the header name from
+        # "X-Ed25519-Signature" to "X-Signature-Ed25519", so check both.
+        signature = (
+            self.headers.get("X-Ed25519-Signature")
+            or self.headers.get("X-Signature-Ed25519")
+            or ""
+        )
         timestamp = self.headers.get("X-Signature-Timestamp", "")
 
+        # Debug: log what we received
+        sys.stderr.write(
+            f"POST {self.path} | sig_len={len(signature)} ts={timestamp!r} "
+            f"body_len={len(body)} | headers: "
+            f"{'X-Ed25519-Signature' in {k for k in self.headers.keys()}} "
+            f"{'X-Signature-Timestamp' in {k for k in self.headers.keys()}}\n"
+        )
+        sys.stderr.flush()
+
         if not verify_discord_signature(body, signature, timestamp):
+            sys.stderr.write(f"  → 401 Invalid signature\n")
+            sys.stderr.flush()
             self.send_response(401)
             self.end_headers()
             self.wfile.write(b"Invalid signature")
