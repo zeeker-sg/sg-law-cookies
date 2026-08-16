@@ -96,6 +96,63 @@ CREATE TABLE IF NOT EXISTS judgment_meta (
     created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_judgment_meta_citation ON judgment_meta (citation);
+
+-- Human-in-the-loop review staging (PRD §4 quality gate).
+-- Cookies produced by the pipeline land here first; they are promoted
+-- to the live `cookies` table only after Discord approval or 72h
+-- auto-approve.  The live site (sitegen) reads only from `cookies`,
+-- so pending cookies never appear publicly.
+CREATE TABLE IF NOT EXISTS pending_cookies (
+    id              TEXT PRIMARY KEY,
+    headline        TEXT NOT NULL,
+    summary         TEXT NOT NULL,
+    why_it_matters  TEXT NOT NULL,
+    significance    TEXT NOT NULL CHECK (significance IN ('high', 'medium', 'low')),
+    folio_areas     TEXT NOT NULL DEFAULT '[]',
+    folio_entities  TEXT NOT NULL DEFAULT '[]',
+    folio_concepts  TEXT NOT NULL DEFAULT '[]',
+    unresolved      TEXT NOT NULL DEFAULT '[]',
+    source_ids      TEXT NOT NULL DEFAULT '[]',
+    item_type       TEXT NOT NULL,          -- 'news' | 'judgment'
+    source_url      TEXT,                    -- original URL for display in Discord
+    created_at      TEXT NOT NULL,            -- when the LLM produced it
+    review_status   TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (review_status IN ('pending','approved','rejected','regenerating')),
+    discord_msg_id  TEXT,                    -- Discord message ID for button mapping
+    reject_count    INTEGER NOT NULL DEFAULT 0,
+    reject_reason   TEXT,                    -- last rejection reason
+    reviewed_at     TEXT,                    -- when approved/rejected
+    auto_approved   INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_cookies (review_status);
+CREATE INDEX IF NOT EXISTS idx_pending_created ON pending_cookies (created_at);
+
+-- Permanent rejection log for kaizen / learning.
+-- When a cookie is discarded (after 2nd rejection, or manual purge),
+-- it is moved here before being deleted from pending_cookies.  This
+-- preserves the full content, the rejection reasons, the unresolved
+-- FOLIO terms at time of rejection, and who rejected it — so patterns
+-- can be analysed over time (e.g. "cookies from source X are rejected
+-- 3x more often" or "unresolved entities correlate with rejections").
+CREATE TABLE IF NOT EXISTS rejected_cookies (
+    id              TEXT PRIMARY KEY,        -- same cookie ID from pending
+    headline        TEXT NOT NULL,
+    summary         TEXT NOT NULL,
+    why_it_matters  TEXT NOT NULL,
+    significance    TEXT NOT NULL,
+    folio_areas     TEXT NOT NULL DEFAULT '[]',
+    folio_entities  TEXT NOT NULL DEFAULT '[]',
+    folio_concepts  TEXT NOT NULL DEFAULT '[]',
+    unresolved      TEXT NOT NULL DEFAULT '[]',
+    source_ids      TEXT NOT NULL DEFAULT '[]',
+    item_type       TEXT NOT NULL,
+    source_url      TEXT,
+    reject_count    INTEGER NOT NULL,
+    reject_reason   TEXT NOT NULL,            -- last rejection reason
+    rejected_by     TEXT,                     -- Discord user ID
+    rejected_at     TEXT NOT NULL,            -- ISO timestamp
+    created_at      TEXT NOT NULL             -- original LLM production time
+);
 """
 
 
@@ -238,6 +295,378 @@ def link_cookie_source(conn: sqlite3.Connection, cookie_id: str, source_id: str)
         (cookie_id, source_id),
     )
     conn.commit()
+
+
+# ── pending cookies (human-in-the-loop review staging) ────────────────
+#
+# Cookies produced by the pipeline land here first.  They are promoted
+# to the live `cookies` table only after Discord approval or 72h
+# auto-approve.  The live site (sitegen) reads only from `cookies`.
+
+
+def save_pending_cookie(
+    conn: sqlite3.Connection,
+    cookie: Cookie,
+    item_type: str,
+    source_url: str | None = None,
+) -> None:
+    """Write a cookie to the pending review staging table.
+
+    Has the same JSON-serialisation conventions as save_cookie — folio
+    refs are dumped to JSON, unresolved is a JSON list.  source_ids are
+    also JSON-encoded here (pending is not normalised via cookie_sources).
+    """
+    conn.execute(
+        """
+        INSERT INTO pending_cookies (id, headline, summary, why_it_matters,
+                                      significance, folio_areas, folio_entities,
+                                      folio_concepts, unresolved, source_ids,
+                                      item_type, source_url, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            headline = excluded.headline,
+            summary = excluded.summary,
+            why_it_matters = excluded.why_it_matters,
+            significance = excluded.significance,
+            folio_areas = excluded.folio_areas,
+            folio_entities = excluded.folio_entities,
+            folio_concepts = excluded.folio_concepts,
+            unresolved = excluded.unresolved,
+            source_ids = excluded.source_ids,
+            item_type = excluded.item_type,
+            source_url = excluded.source_url,
+            created_at = excluded.created_at
+        """,
+        (
+            cookie.id,
+            cookie.headline,
+            cookie.summary,
+            cookie.why_it_matters,
+            cookie.significance,
+            _dump_refs(cookie.folio_areas),
+            _dump_refs(cookie.folio_entities),
+            _dump_refs(cookie.folio_concepts),
+            json.dumps(cookie.unresolved),
+            json.dumps(cookie.source_ids),
+            item_type,
+            source_url,
+            cookie.created_at.isoformat(),
+        ),
+    )
+    conn.commit()
+
+
+def list_pending_cookies(
+    conn: sqlite3.Connection,
+    status: str = "pending",
+    not_posted: bool = False,
+) -> list[sqlite3.Row]:
+    """Pending cookies by review_status.
+
+    If not_posted is True, only return rows where discord_msg_id IS NULL
+    (used by the Discord posting cron — avoids re-posting cookies that
+    are already on Discord).
+    """
+    sql = "SELECT * FROM pending_cookies WHERE review_status = ?"
+    params: list = [status]
+    if not_posted:
+        sql += " AND discord_msg_id IS NULL"
+    sql += " ORDER BY created_at"
+    return conn.execute(sql, params).fetchall()
+
+
+def get_pending_cookie(conn: sqlite3.Connection, cookie_id: str) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM pending_cookies WHERE id = ?", (cookie_id,)
+    ).fetchone()
+
+
+def set_pending_discord_msg_id(
+    conn: sqlite3.Connection, cookie_id: str, discord_msg_id: str
+) -> None:
+    conn.execute(
+        "UPDATE pending_cookies SET discord_msg_id = ? WHERE id = ?",
+        (discord_msg_id, cookie_id),
+    )
+    conn.commit()
+
+
+def promote_pending_cookie(conn: sqlite3.Connection, cookie_id: str) -> Cookie | None:
+    """Move a pending cookie to the live cookies table.
+
+    Copies all cookie fields, creates cookie_sources links, and deletes
+    the pending row.  Returns the promoted Cookie, or None if the pending
+    row doesn't exist or was already promoted.
+    """
+    row = get_pending_cookie(conn, cookie_id)
+    if row is None:
+        return None
+
+    # Check if already in live cookies (idempotent — avoid double insert)
+    existing = conn.execute(
+        "SELECT 1 FROM cookies WHERE id = ?", (cookie_id,)
+    ).fetchone()
+    if existing is not None:
+        # Already promoted; just clean up the pending row.
+        conn.execute("DELETE FROM pending_cookies WHERE id = ?", (cookie_id,))
+        conn.commit()
+        return get_cookie(conn, cookie_id)
+
+    cookie = Cookie(
+        id=row["id"],
+        source_ids=json.loads(row["source_ids"]),
+        headline=row["headline"],
+        summary=row["summary"],
+        why_it_matters=row["why_it_matters"],
+        significance=row["significance"],
+        folio_areas=_load_refs(row["folio_areas"]),
+        folio_entities=_load_refs(row["folio_entities"]),
+        folio_concepts=_load_refs(row["folio_concepts"]),
+        unresolved=json.loads(row["unresolved"]),
+        created_at=datetime.fromisoformat(row["created_at"]),
+    )
+    # Insert into live cookies + source links.
+    conn.execute(
+        """
+        INSERT INTO cookies (id, headline, summary, why_it_matters, significance,
+                             folio_areas, folio_entities, folio_concepts, unresolved,
+                             is_duplicate, duplicate_of, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)
+        """,
+        (
+            cookie.id,
+            cookie.headline,
+            cookie.summary,
+            cookie.why_it_matters,
+            cookie.significance,
+            _dump_refs(cookie.folio_areas),
+            _dump_refs(cookie.folio_entities),
+            _dump_refs(cookie.folio_concepts),
+            json.dumps(cookie.unresolved),
+            cookie.created_at.isoformat(),
+        ),
+    )
+    conn.executemany(
+        "INSERT OR IGNORE INTO cookie_sources (cookie_id, source_id) VALUES (?, ?)",
+        [(cookie.id, sid) for sid in cookie.source_ids],
+    )
+    # Mark as approved, then delete the pending row.
+    conn.execute(
+        "UPDATE pending_cookies SET review_status = 'approved', reviewed_at = ? WHERE id = ?",
+        (datetime.now(timezone.utc).isoformat(), cookie_id),
+    )
+    conn.execute("DELETE FROM pending_cookies WHERE id = ?", (cookie_id,))
+    conn.commit()
+    return cookie
+
+
+def reject_pending_cookie(
+    conn: sqlite3.Connection,
+    cookie_id: str,
+    reason: str,
+    rejected_by: str | None = None,
+    max_rejects: int = 2,
+) -> str:
+    """Reject a pending cookie.  Returns the new review_status.
+
+    On the first rejection: sets review_status='regenerating', increments
+    reject_count, stores the reason, clears discord_msg_id (so the
+    regenerated cookie gets re-posted for review).
+
+    On the final rejection (reject_count >= max_rejects): moves the
+    cookie to rejected_cookies (permanent log) and deletes it from
+    pending_cookies.
+    """
+    row = get_pending_cookie(conn, cookie_id)
+    if row is None:
+        raise KeyError(f"no pending cookie with id {cookie_id!r}")
+
+    new_count = row["reject_count"] + 1
+    now = datetime.now(timezone.utc).isoformat()
+
+    if new_count >= max_rejects:
+        # Final rejection — archive to rejected_cookies, then delete.
+        conn.execute(
+            """
+            INSERT INTO rejected_cookies (id, headline, summary, why_it_matters,
+                                           significance, folio_areas, folio_entities,
+                                           folio_concepts, unresolved, source_ids,
+                                           item_type, source_url, reject_count,
+                                           reject_reason, rejected_by, rejected_at,
+                                           created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                row["id"],
+                row["headline"],
+                row["summary"],
+                row["why_it_matters"],
+                row["significance"],
+                row["folio_areas"],
+                row["folio_entities"],
+                row["folio_concepts"],
+                row["unresolved"],
+                row["source_ids"],
+                row["item_type"],
+                row["source_url"],
+                new_count,
+                reason,
+                rejected_by,
+                now,
+                row["created_at"],
+            ),
+        )
+        conn.execute("DELETE FROM pending_cookies WHERE id = ?", (cookie_id,))
+        conn.commit()
+        return "rejected"
+
+    # First rejection — re-queue for regeneration.
+    conn.execute(
+        """
+        UPDATE pending_cookies
+        SET review_status = 'regenerating',
+            reject_count = ?,
+            reject_reason = ?,
+            discord_msg_id = NULL
+        WHERE id = ?
+        """,
+        (new_count, reason, cookie_id),
+    )
+    conn.commit()
+    return "regenerating"
+
+
+def update_pending_cookie_text(
+    conn: sqlite3.Connection,
+    cookie_id: str,
+    headline: str | None = None,
+    summary: str | None = None,
+    why_it_matters: str | None = None,
+) -> None:
+    """Update editable text fields on a pending cookie (from the Edit button)."""
+    updates: list[str] = []
+    params: list = []
+    if headline is not None:
+        updates.append("headline = ?")
+        params.append(headline)
+    if summary is not None:
+        updates.append("summary = ?")
+        params.append(summary)
+    if why_it_matters is not None:
+        updates.append("why_it_matters = ?")
+        params.append(why_it_matters)
+    if not updates:
+        return
+    params.append(cookie_id)
+    conn.execute(
+        f"UPDATE pending_cookies SET {', '.join(updates)} WHERE id = ?",
+        params,
+    )
+    conn.commit()
+
+
+def list_auto_approvable(
+    conn: sqlite3.Connection, max_age_hours: int = 72
+) -> list[sqlite3.Row]:
+    """Pending cookies older than max_age_hours, still in 'pending' status."""
+    cutoff = (
+        datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    ).isoformat()
+    return conn.execute(
+        """
+        SELECT * FROM pending_cookies
+        WHERE review_status = 'pending' AND created_at < ?
+        ORDER BY created_at
+        """,
+        (cutoff,),
+    ).fetchall()
+
+
+def auto_approve_pending(
+    conn: sqlite3.Connection, max_age_hours: int = 72
+) -> list[str]:
+    """Promote all pending cookies older than max_age_hours to live cookies.
+
+    Returns the list of promoted cookie IDs.  Sets auto_approved=1 on
+    each before promoting (for audit tracking — the fact that it was
+    auto-approved is lost when the pending row is deleted, so we log
+    this separately if needed).
+    """
+    rows = list_auto_approvable(conn, max_age_hours)
+    promoted: list[str] = []
+    for row in rows:
+        # Mark as auto-approved for any audit log before promoting.
+        conn.execute(
+            "UPDATE pending_cookies SET auto_approved = 1 WHERE id = ?",
+            (row["id"],),
+        )
+        conn.commit()
+        cookie = promote_pending_cookie(conn, row["id"])
+        if cookie is not None:
+            promoted.append(cookie.id)
+    return promoted
+
+
+def list_regenerating(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Pending cookies waiting for LLM regeneration after rejection."""
+    return conn.execute(
+        "SELECT * FROM pending_cookies WHERE review_status = 'regenerating' ORDER BY created_at"
+    ).fetchall()
+
+
+def count_pending(conn: sqlite3.Connection) -> dict[str, int]:
+    """Counts by review_status — for watchdog / dashboard reporting."""
+    rows = conn.execute(
+        "SELECT review_status, COUNT(*) AS n FROM pending_cookies GROUP BY review_status"
+    ).fetchall()
+    return {row["review_status"]: row["n"] for row in rows}
+
+
+# ── rejected cookies log (kaizen / learning) ───────────────────────────
+
+
+def list_rejected_cookies(
+    conn: sqlite3.Connection, limit: int = 100
+) -> list[sqlite3.Row]:
+    """Rejected cookies, newest rejection first."""
+    return conn.execute(
+        "SELECT * FROM rejected_cookies ORDER BY rejected_at DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+
+
+def rejected_cookie_stats(conn: sqlite3.Connection) -> dict:
+    """Aggregate stats for kaizen analysis.
+
+    Returns: total rejected, by significance, by item_type, top rejection
+    reasons, and whether unresolved FOLIO terms correlate with rejections.
+    """
+    total = conn.execute(
+        "SELECT COUNT(*) AS n FROM rejected_cookies"
+    ).fetchone()["n"]
+    by_sig = {
+        row["significance"]: row["n"]
+        for row in conn.execute(
+            "SELECT significance, COUNT(*) AS n FROM rejected_cookies GROUP BY significance"
+        )
+    }
+    by_type = {
+        row["item_type"]: row["n"]
+        for row in conn.execute(
+            "SELECT item_type, COUNT(*) AS n FROM rejected_cookies GROUP BY item_type"
+        )
+    }
+    # How many rejected cookies had unresolved FOLIO terms?
+    had_unresolved = conn.execute(
+        "SELECT COUNT(*) AS n FROM rejected_cookies WHERE unresolved != '[]'"
+    ).fetchone()["n"]
+    return {
+        "total": total,
+        "by_significance": by_sig,
+        "by_item_type": by_type,
+        "had_unresolved_terms": had_unresolved,
+        "pct_with_unresolved": round(had_unresolved / total * 100, 1) if total else 0,
+    }
 
 
 def _row_to_cookie(conn: sqlite3.Connection, row: sqlite3.Row) -> Cookie:

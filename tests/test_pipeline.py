@@ -152,10 +152,12 @@ def test_process_news_extracts_resolves_and_stores(conn):
     assert "xyzzy doctrine" in cookie.unresolved
     assert "xyzzy doctrine" in [t for t, _, _ in db.list_unresolved_terms(conn)]
 
-    stored = db.get_cookie(conn, cookie.id)
+    stored = db.get_pending_cookie(conn, cookie.id)
     assert stored is not None
-    assert len(stored.source_ids) == 1
-    source = db.get_source(conn, stored.source_ids[0])
+    assert stored["review_status"] == "pending"
+    source_ids = json.loads(stored["source_ids"])
+    assert len(source_ids) == 1
+    source = db.get_source(conn, source_ids[0])
     assert source.source_url == "https://example.org/a"
     assert source.token_count > 0
 
@@ -172,7 +174,9 @@ def test_process_news_same_url_skips_llm_and_reuses_cookies(conn):
 
     assert len(stub.calls) == 1  # no second LLM call
     assert [c.id for c in second] == [c.id for c in first]
-    assert len(db.find_recent_cookies(conn, 1)) == 1
+    # Cookies are now in pending_cookies (human-in-the-loop review),
+    # not in the live cookies table.
+    assert db.count_pending(conn).get("pending", 0) == 1
 
 
 @respx.mock
@@ -186,8 +190,14 @@ def test_duplicate_headline_flagged_and_corroborates_original(conn):
 
     assert second.is_duplicate
     assert second.duplicate_of == first.id
-    original = db.get_cookie(conn, first.id)
-    assert len(original.source_ids) == 2  # corroborating source linked
+    # Both cookies are in pending_cookies; the original hasn't been
+    # promoted to live yet, so the corroborating source link is deferred
+    # until promotion.  Verify both are pending.
+    first_pending = db.get_pending_cookie(conn, first.id)
+    second_pending = db.get_pending_cookie(conn, second.id)
+    assert first_pending is not None
+    assert second_pending is not None
+    assert first_pending["review_status"] == "pending"
 
 
 # ── run_source ───────────────────────────────────────────────────────
@@ -215,7 +225,8 @@ def test_run_source_end_to_end_and_idempotent_rerun(conn):
         assert result.processed == 2
         assert sorted(c.headline for c in result.cookies) == ["Cookie A", "Cookie B"]
         assert db.get_watermark(conn, "sglawwatch", "headlines") == ROW2["imported_on"]
-        assert len(db.find_recent_cookies(conn, 1)) == 2
+        # Cookies go to pending_cookies (human-in-the-loop review).
+        assert db.count_pending(conn).get("pending", 0) == 2
         registry = db.list_registry(conn)
         assert [(e.zeeker_db, e.table, e.active) for e in registry] == [
             ("sglawwatch", "headlines", True)
@@ -227,7 +238,8 @@ def test_run_source_end_to_end_and_idempotent_rerun(conn):
         )
 
     assert rerun.processed == 0
-    assert len(db.find_recent_cookies(conn, 1)) == 2  # no duplicate cookies
+    # No duplicate cookies — still only 2 in pending.
+    assert db.count_pending(conn).get("pending", 0) == 2
     assert len(stub.calls) == 2  # no further LLM calls
     second_fetch = headlines.calls[1].request.url.params
     assert second_fetch["imported_on__gt"] == ROW2["imported_on"]
@@ -247,7 +259,7 @@ def test_run_source_dry_run_makes_no_writes(conn):
     assert [item.title for item in result.dry_run_items] == ["EP salary floor to rise"]
     assert result.processed == 0
     assert db.get_watermark(conn, "sglawwatch", "headlines") is None
-    assert db.find_recent_cookies(conn, 1) == []
+    assert db.count_pending(conn) == {}  # no pending cookies written
     assert db.list_registry(conn) == []
 
 

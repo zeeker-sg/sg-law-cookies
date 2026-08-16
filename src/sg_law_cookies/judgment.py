@@ -18,6 +18,7 @@ import logging
 import re
 import sqlite3
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import httpx
 
@@ -419,11 +420,35 @@ class JudgmentCookies(list):
 
 
 def _cookies_for_source(conn: sqlite3.Connection, source_id: str) -> list[Cookie]:
+    """Find cookies linked to a source — checks live cookies first,
+    then pending_cookies (human-in-the-loop review staging)."""
     rows = conn.execute(
         "SELECT cookie_id FROM cookie_sources WHERE source_id = ?", (source_id,)
     ).fetchall()
-    cookies = (db.get_cookie(conn, row["cookie_id"]) for row in rows)
-    return [cookie for cookie in cookies if cookie is not None]
+    cookies = [db.get_cookie(conn, row["cookie_id"]) for row in rows]
+    live = [c for c in cookies if c is not None]
+    if live:
+        return live
+    # Pending cookies (source_ids is a JSON list in pending_cookies).
+    for row in db.list_pending_cookies(conn, status="pending"):
+        sids = json.loads(row["source_ids"])
+        if source_id in sids:
+            return [
+                Cookie(
+                    id=row["id"],
+                    source_ids=sids,
+                    headline=row["headline"],
+                    summary=row["summary"],
+                    why_it_matters=row["why_it_matters"],
+                    significance=row["significance"],
+                    folio_areas=db._load_refs(row["folio_areas"]),
+                    folio_entities=db._load_refs(row["folio_entities"]),
+                    folio_concepts=db._load_refs(row["folio_concepts"]),
+                    unresolved=json.loads(row["unresolved"]),
+                    created_at=datetime.fromisoformat(row["created_at"]),
+                )
+            ]
+    return []
 
 
 # ── the pipeline ─────────────────────────────────────────────────────
@@ -578,7 +603,12 @@ def process_judgment(
             folio_concepts=topic.folio_concepts,
             unresolved=topic.unresolved,
         )
-        db.save_cookie(conn, cookie)
+        # Human-in-the-loop: cookies go to the pending review table,
+        # not the live cookies table.  They are promoted to the live
+        # site only after Discord approval or 72h auto-approve.
+        db.save_pending_cookie(
+            conn, cookie, item_type=raw_item.item_type, source_url=raw_item.source_url
+        )
         unresolved.extend(term for term in topic.unresolved if term not in unresolved)
         cookies.append(cookie)
 
