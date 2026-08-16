@@ -67,6 +67,7 @@ def discord_request(
         headers={
             "Authorization": f"Bot {token}",
             "Content-Type": "application/json",
+            "User-Agent": "DiscordBot (https://zeeker.sg, 1.0)",
         },
     )
     try:
