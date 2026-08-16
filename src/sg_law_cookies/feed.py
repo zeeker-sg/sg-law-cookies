@@ -38,7 +38,7 @@ def _tag_authority(base_url: str) -> str:
 
 
 def _entry_id(authority: str, cookie: Cookie) -> str:
-    day = cookie.created_at.date().isoformat()
+    day = (cookie.admitted_at or cookie.created_at).date().isoformat()
     return f"tag:{authority},{day}:cookie/{cookie.id}"
 
 
@@ -47,7 +47,7 @@ def _latest_cookies(conn: sqlite3.Connection, limit: int = MAX_ENTRIES) -> list[
     picked: list[Cookie] = []
     for day_iso in db.list_cookie_dates(conn):
         day_cookies = db.cookies_for_date(conn, date.fromisoformat(day_iso))
-        day_cookies.sort(key=lambda c: (c.created_at, c.id), reverse=True)
+        day_cookies.sort(key=lambda c: (c.admitted_at or c.created_at, c.id), reverse=True)
         for cookie in day_cookies:
             if cookie.is_duplicate:
                 continue
@@ -71,13 +71,13 @@ def build_feed(conn: sqlite3.Connection, base_url: str) -> dict:
             # ORIGINAL document URL of the first source — never Zeeker (PRD §2.5).
             link = cookie_sources[0].source_url
         else:
-            link = f"{base}/daily/{cookie.created_at.date().isoformat()}/"
+            link = f"{base}/daily/{(cookie.admitted_at or cookie.created_at).date().isoformat()}/"
         entries.append(
             {
                 "title": cookie.headline,
                 "link": link,
                 "id": _entry_id(authority, cookie),
-                "updated": _rfc3339(cookie.created_at),
+                "updated": _rfc3339(cookie.admitted_at or cookie.created_at),
                 "summary": f"{cookie.summary} Why it matters: {cookie.why_it_matters}",
                 "author": FEED_AUTHOR,
             }

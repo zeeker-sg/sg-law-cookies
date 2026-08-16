@@ -63,12 +63,16 @@ def _cookie(conn, source: Source | None, **overrides) -> Cookie:
         folio_concepts=[],
         source_ids=[source.id] if source else [],
         created_at=datetime(2026, 6, 11, 1, 0, 0, tzinfo=timezone.utc),
+        admitted_at=datetime(2026, 6, 11, 1, 0, 0, tzinfo=timezone.utc),
     )
     defaults.update(overrides)
+    # If created_at is overridden but admitted_at isn't, align them so
+    # the cookie files under the intended day (admitted_at drives daily pages).
+    if "created_at" in overrides and "admitted_at" not in overrides:
+        defaults["admitted_at"] = overrides["created_at"]
     cookie = Cookie(**defaults)
-    # Publication date = MIN(sources.date); align the source's document date to
-    # the cookie's created_at day so the cookie files under the day the test
-    # intends (created_at encodes it). Sourceless cookies fall back to created_at.
+    # Source document date — displayed on the cookie, but no longer
+    # determines the daily page (admitted_at does).
     if source is not None:
         source = source.model_copy(update={"date": cookie.created_at.date()})
         db.upsert_source(conn, source)

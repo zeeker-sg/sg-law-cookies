@@ -51,7 +51,7 @@ def test_list_cookie_dates_distinct_desc(conn):
         datetime(2026, 6, 10, 9, 45, tzinfo=timezone.utc),  # same day twice
     ]
     for dt in days:
-        db.save_cookie(conn, make_cookie(created_at=dt))
+        db.save_cookie(conn, make_cookie(created_at=dt, admitted_at=dt))
 
     assert db.list_cookie_dates(conn) == ["2026-06-11", "2026-06-10", "2026-06-08"]
 
@@ -62,17 +62,20 @@ def test_list_cookie_dates_empty(conn):
 
 def test_cookies_for_date_filters_by_day_and_includes_duplicates(conn):
     on_day_1 = make_cookie(
-        headline="first", created_at=datetime(2026, 6, 11, 5, 0, tzinfo=timezone.utc)
+        headline="first", created_at=datetime(2026, 6, 11, 5, 0, tzinfo=timezone.utc),
+        admitted_at=datetime(2026, 6, 11, 5, 0, tzinfo=timezone.utc),
     )
     on_day_2 = make_cookie(
         headline="dup",
         is_duplicate=True,
         duplicate_of=on_day_1.id,
         created_at=datetime(2026, 6, 11, 8, 0, tzinfo=timezone.utc),
+        admitted_at=datetime(2026, 6, 11, 8, 0, tzinfo=timezone.utc),
     )
     off_day = make_cookie(
         headline="other day",
         created_at=datetime(2026, 6, 10, 6, 0, tzinfo=timezone.utc),
+        admitted_at=datetime(2026, 6, 10, 6, 0, tzinfo=timezone.utc),
     )
     for cookie in (on_day_2, off_day, on_day_1):
         db.save_cookie(conn, cookie)

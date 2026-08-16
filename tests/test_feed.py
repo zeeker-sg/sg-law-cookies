@@ -153,6 +153,7 @@ def test_entry_without_sources_falls_back_to_day_page(conn):
         why_it_matters="W.",
         significance="low",
         created_at=datetime(2026, 6, 11, 6, 0, tzinfo=timezone.utc),
+        admitted_at=datetime(2026, 6, 11, 6, 0, tzinfo=timezone.utc),
     )
     db.save_cookie(conn, cookie)
     feed = build_feed(conn, BASE_URL)

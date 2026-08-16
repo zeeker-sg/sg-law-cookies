@@ -92,7 +92,8 @@ class Cookie(BaseModel):
     unresolved: list[str] = Field(default_factory=list)
     is_duplicate: bool = False
     duplicate_of: str | None = None
-    created_at: datetime = Field(default_factory=_utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)  # when the LLM produced it
+    admitted_at: datetime | None = None  # when it entered the live DB (approval date)
 
 
 class JudgmentIssue(BaseModel):

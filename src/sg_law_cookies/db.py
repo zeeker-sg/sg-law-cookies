@@ -162,6 +162,14 @@ def init_db(path: str | Path) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(_SCHEMA)
+    # ── Lightweight migrations for pre-existing DBs ────────────────────
+    # CREATE TABLE IF NOT EXISTS won't add columns to an existing table.
+    # Add admitted_at if missing, and backfill from created_at.
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(cookies)")}
+    if "admitted_at" not in cols:
+        conn.execute("ALTER TABLE cookies ADD COLUMN admitted_at TEXT")
+        conn.execute("UPDATE cookies SET admitted_at = created_at WHERE admitted_at IS NULL")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_cookies_admitted_at ON cookies (admitted_at)")
     conn.commit()
     return conn
 
@@ -246,12 +254,14 @@ def get_source(conn: sqlite3.Connection, source_id: str) -> Source | None:
 
 def save_cookie(conn: sqlite3.Connection, cookie: Cookie) -> None:
     """Write the cookie row plus its cookie_sources links."""
+    # admitted_at defaults to now if not set (e.g. direct test inserts).
+    admitted = cookie.admitted_at or datetime.now(timezone.utc)
     conn.execute(
         """
         INSERT INTO cookies (id, headline, summary, why_it_matters, significance,
                              folio_areas, folio_entities, folio_concepts, unresolved,
-                             is_duplicate, duplicate_of, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             is_duplicate, duplicate_of, created_at, admitted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (id) DO UPDATE SET
             headline = excluded.headline,
             summary = excluded.summary,
@@ -263,7 +273,8 @@ def save_cookie(conn: sqlite3.Connection, cookie: Cookie) -> None:
             unresolved = excluded.unresolved,
             is_duplicate = excluded.is_duplicate,
             duplicate_of = excluded.duplicate_of,
-            created_at = excluded.created_at
+            created_at = excluded.created_at,
+            admitted_at = COALESCE(admitted_at, excluded.admitted_at)
         """,
         (
             cookie.id,
@@ -278,6 +289,7 @@ def save_cookie(conn: sqlite3.Connection, cookie: Cookie) -> None:
             int(cookie.is_duplicate),
             cookie.duplicate_of,
             cookie.created_at.isoformat(),
+            admitted.isoformat(),
         ),
     )
     conn.execute("DELETE FROM cookie_sources WHERE cookie_id = ?", (cookie.id,))
@@ -426,12 +438,14 @@ def promote_pending_cookie(conn: sqlite3.Connection, cookie_id: str) -> Cookie |
         created_at=datetime.fromisoformat(row["created_at"]),
     )
     # Insert into live cookies + source links.
+    # admitted_at = now() — the entry date into the live database.
+    now_iso = datetime.now(timezone.utc).isoformat()
     conn.execute(
         """
         INSERT INTO cookies (id, headline, summary, why_it_matters, significance,
                              folio_areas, folio_entities, folio_concepts, unresolved,
-                             is_duplicate, duplicate_of, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)
+                             is_duplicate, duplicate_of, created_at, admitted_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)
         """,
         (
             cookie.id,
@@ -444,6 +458,7 @@ def promote_pending_cookie(conn: sqlite3.Connection, cookie_id: str) -> Cookie |
             _dump_refs(cookie.folio_concepts),
             json.dumps(cookie.unresolved),
             cookie.created_at.isoformat(),
+            now_iso,
         ),
     )
     conn.executemany(
@@ -691,6 +706,7 @@ def _row_to_cookie(conn: sqlite3.Connection, row: sqlite3.Row) -> Cookie:
         is_duplicate=bool(row["is_duplicate"]),
         duplicate_of=row["duplicate_of"],
         created_at=datetime.fromisoformat(row["created_at"]),
+        admitted_at=datetime.fromisoformat(row["admitted_at"]) if row["admitted_at"] else None,
     )
 
 
@@ -723,7 +739,7 @@ def find_recent_cookies(
     end = as_of or date.today()
     cutoff = (end - timedelta(days=lookback_days)).isoformat()
     rows = conn.execute(
-        "SELECT * FROM cookies WHERE created_at >= ? ORDER BY created_at DESC",
+        "SELECT * FROM cookies WHERE admitted_at >= ? ORDER BY admitted_at DESC",
         (cutoff,),
     ).fetchall()
     return [_row_to_cookie(conn, row) for row in rows]
@@ -885,55 +901,52 @@ def get_daily_stats(conn: sqlite3.Connection, day: date) -> DailyStats | None:
 # ── site read queries (sitegen / feed) ───────────────────────────────
 
 
-# A cookie is filed under its PUBLICATION date — the earliest document date
-# across its sources (judgment decision_date, article published_date), not the
-# date we processed it. Sourceless cookies fall back to their processing date so
-# they still land on a page. Source dates are ISO 'YYYY-MM-DD' TEXT, so MIN()
-# and string comparison sort chronologically.
-_PUB_DATE_SQL = (
-    "COALESCE("
-    "(SELECT MIN(s.date) FROM sources s "
-    "JOIN cookie_sources cs ON cs.source_id = s.id "
-    "WHERE cs.cookie_id = cookies.id), "
-    "date(cookies.created_at))"
-)
+# A cookie is filed under its ADMITTED date — the day it entered the live
+# database (approved via Discord or auto-approved after 72h). This is the
+# "today's cookies" date: cookies appear on the site the day they are
+# admitted, not the day the underlying news/judgment was published.
+# Legacy cookies backfilled with admitted_at = created_at.
+# Source document dates are still stored and displayed on the cookie
+# detail page — they just no longer determine the daily page grouping.
+_ADMITTED_DATE_SQL = "date(cookies.admitted_at)"
 
 
 def list_cookie_dates(conn: sqlite3.Connection) -> list[str]:
-    """Distinct publication days that have cookies, newest first."""
+    """Distinct admitted days that have cookies, newest first."""
     return [
         row["day"]
         for row in conn.execute(
-            f"SELECT DISTINCT {_PUB_DATE_SQL} AS day FROM cookies ORDER BY day DESC"
+            f"SELECT DISTINCT {_ADMITTED_DATE_SQL} AS day FROM cookies ORDER BY day DESC"
         )
     ]
 
 
 def cookies_for_date(conn: sqlite3.Connection, day: date) -> list[Cookie]:
-    """All cookies published on the given day, oldest first (by processing time).
+    """All cookies admitted to the live DB on the given day, oldest first.
 
-    "Published" = the earliest source document date (see _PUB_DATE_SQL).
-    Includes duplicate-flagged cookies; filtering is left to the caller.
+    "Admitted" = the date the cookie was promoted from pending to live
+    (see _ADMITTED_DATE_SQL). Includes duplicate-flagged cookies;
+    filtering is left to the caller.
     """
     rows = conn.execute(
-        f"SELECT * FROM cookies WHERE {_PUB_DATE_SQL} = ? ORDER BY created_at, id",
+        f"SELECT * FROM cookies WHERE {_ADMITTED_DATE_SQL} = ? ORDER BY admitted_at, id",
         (day.isoformat(),),
     ).fetchall()
     return [_row_to_cookie(conn, row) for row in rows]
 
 
 def cookies_for_week(conn: sqlite3.Connection, monday: date) -> list[Cookie]:
-    """All cookies published in the 7-day week beginning `monday`, oldest first.
+    """All cookies admitted in the 7-day week beginning `monday`, oldest first.
 
-    Day grouping uses publication date (see _PUB_DATE_SQL); the upper bound is
+    Day grouping uses admitted date (see _ADMITTED_DATE_SQL); the upper bound is
     exclusive. Includes duplicate-flagged cookies; filtering is left to the
     caller.
     """
     start = monday.isoformat()
     end = (monday + timedelta(days=7)).isoformat()  # exclusive
     rows = conn.execute(
-        f"SELECT * FROM cookies WHERE {_PUB_DATE_SQL} >= ? AND {_PUB_DATE_SQL} < ? "
-        "ORDER BY created_at, id",
+        f"SELECT * FROM cookies WHERE {_ADMITTED_DATE_SQL} >= ? AND {_ADMITTED_DATE_SQL} < ? "
+        "ORDER BY admitted_at, id",
         (start, end),
     ).fetchall()
     return [_row_to_cookie(conn, row) for row in rows]
@@ -983,10 +996,10 @@ def latest_unresolved_terms(conn: sqlite3.Connection, day: date) -> list[str]:
 
 
 def compute_daily_stats(conn: sqlite3.Connection, day: date) -> DailyStats:
-    """Compute stats over cookies created on the given date."""
+    """Compute stats over cookies admitted to the live DB on the given date."""
     day_iso = day.isoformat()
     rows = conn.execute(
-        "SELECT * FROM cookies WHERE substr(created_at, 1, 10) = ? ORDER BY created_at",
+        "SELECT * FROM cookies WHERE date(admitted_at) = ? ORDER BY admitted_at",
         (day_iso,),
     ).fetchall()
     cookies = [_row_to_cookie(conn, row) for row in rows]

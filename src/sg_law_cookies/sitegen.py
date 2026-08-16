@@ -114,12 +114,13 @@ def _utc_day(dt: datetime) -> date:
     return dt.astimezone(timezone.utc).date()
 
 
-def _pub_day(cookie: Cookie, srcs: list[Source]) -> date:
-    """The cookie's publication date: earliest source document date, falling
-    back to its processing date. Mirrors db._PUB_DATE_SQL so a cookie buckets
-    into the same day the daily/weekly queries placed it."""
-    dates = [s.date for s in srcs if s.date]
-    return min(dates) if dates else _utc_day(cookie.created_at)
+def _admitted_day(cookie: Cookie) -> date:
+    """The cookie's admitted date: the day it entered the live database.
+    Mirrors db._ADMITTED_DATE_SQL so a cookie buckets into the same day
+    the daily/weekly queries placed it."""
+    if cookie.admitted_at:
+        return _utc_day(cookie.admitted_at)
+    return _utc_day(cookie.created_at)  # fallback for legacy rows
 
 
 def _week_range_display(monday: date) -> str:
@@ -242,7 +243,7 @@ def build_daily_context(
     }
 
     ctx["oven_time"] = (
-        _to_sgt(max(c.created_at for c in cookies)).strftime("%H:%M") + " SGT"
+        _to_sgt(max((c.admitted_at or c.created_at) for c in cookies)).strftime("%H:%M") + " SGT"
     )
 
     ranked_areas = sorted(area_counts.items(), key=lambda kv: (-kv[1], kv[0]))
@@ -389,7 +390,7 @@ def build_weekly_context(
     ingredients: list[str] = []
     for cookie in cookies:
         srcs = sources_map.get(cookie.id, [])
-        cday = _pub_day(cookie, srcs)
+        cday = _admitted_day(cookie)
         if srcs:
             url = srcs[0].source_url  # ORIGINAL document URL (PRD §2.5)
             label = source_label(srcs[0])

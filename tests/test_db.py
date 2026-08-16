@@ -57,6 +57,7 @@ def make_cookie(**overrides) -> Cookie:
         ],
         unresolved=["PDPC"],
         created_at=datetime(2026, 6, 11, 9, 0, tzinfo=timezone.utc),
+        admitted_at=datetime(2026, 6, 11, 9, 0, tzinfo=timezone.utc),
     )
     defaults.update(overrides)
     return Cookie(**defaults)
@@ -149,6 +150,7 @@ def test_find_recent_cookies(conn):
     old = make_cookie(
         id="old-cookie",
         created_at=datetime(2026, 5, 1, 9, 0, tzinfo=timezone.utc),
+        admitted_at=datetime(2026, 5, 1, 9, 0, tzinfo=timezone.utc),
     )
     db.save_cookie(conn, recent)
     db.save_cookie(conn, old)
@@ -274,6 +276,7 @@ def test_compute_daily_stats(conn):
         id="c-other",
         source_ids=[judgment_src.id],
         created_at=datetime(2026, 6, 9, 9, 0, tzinfo=timezone.utc),
+        admitted_at=datetime(2026, 6, 9, 9, 0, tzinfo=timezone.utc),
     )
     for cookie in (c1, c2, c3, other_day):
         db.save_cookie(conn, cookie)
