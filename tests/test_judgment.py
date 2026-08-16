@@ -297,9 +297,13 @@ def test_short_path_single_pass_stores_cookie_and_meta(conn):
     assert cookie.headline.startswith("High Court holds")
     assert cookie.folio_areas[0].preferred_label == "Contract Law"
     assert cookie.folio_entities[0].branch == "sg_local"
-    stored_cookie = db.get_cookie(conn, cookie.id)
-    assert stored_cookie is not None
-    source = db.get_source(conn, stored_cookie.source_ids[0])
+    # Cookie is in pending_cookies (human-in-the-loop review staging).
+    stored = db.get_pending_cookie(conn, cookie.id)
+    assert stored is not None
+    assert stored["review_status"] == "pending"
+    import json as _j
+    source_ids = _j.loads(stored["source_ids"])
+    source = db.get_source(conn, source_ids[0])
     assert source.item_type == "judgment"
     assert source.source_url == item.source_url
 
@@ -509,7 +513,8 @@ def test_idempotent_rerun_skips_llm_and_returns_existing(conn):
     assert [c.id for c in second] == [c.id for c in first]
     assert second.meta is not None
     assert second.meta.citation == "[2026] SGHC 34"
-    assert len(db.find_recent_cookies(conn, 1)) == 1  # no duplicate cookies
+    # Cookie is in pending_cookies, not the live cookies table.
+    assert db.count_pending(conn).get("pending", 0) == 1  # no duplicate cookies
 
 
 # ── issue cap ────────────────────────────────────────────────────────

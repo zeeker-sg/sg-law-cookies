@@ -1,7 +1,9 @@
 """News enrichment pipeline and per-source run loop (PRD sections 4.1, 8)."""
 
+import json as _json
 import sqlite3
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -31,11 +33,36 @@ def _estimate_tokens(text: str) -> int:
 
 
 def _cookies_for_source(conn: sqlite3.Connection, source_id: str) -> list[Cookie]:
+    """Find cookies linked to a source — checks live cookies first,
+    then pending_cookies (human-in-the-loop review staging)."""
+    # Live cookies (via cookie_sources join).
     rows = conn.execute(
         "SELECT cookie_id FROM cookie_sources WHERE source_id = ?", (source_id,)
     ).fetchall()
-    cookies = (db.get_cookie(conn, row["cookie_id"]) for row in rows)
-    return [cookie for cookie in cookies if cookie is not None]
+    cookies = [db.get_cookie(conn, row["cookie_id"]) for row in rows]
+    live = [c for c in cookies if c is not None]
+    if live:
+        return live
+    # Pending cookies (source_ids is a JSON list in pending_cookies).
+    for row in db.list_pending_cookies(conn, status="pending"):
+        sids = _json.loads(row["source_ids"])
+        if source_id in sids:
+            return [
+                Cookie(
+                    id=row["id"],
+                    source_ids=sids,
+                    headline=row["headline"],
+                    summary=row["summary"],
+                    why_it_matters=row["why_it_matters"],
+                    significance=row["significance"],
+                    folio_areas=db._load_refs(row["folio_areas"]),
+                    folio_entities=db._load_refs(row["folio_entities"]),
+                    folio_concepts=db._load_refs(row["folio_concepts"]),
+                    unresolved=_json.loads(row["unresolved"]),
+                    created_at=datetime.fromisoformat(row["created_at"]),
+                )
+            ]
+    return []
 
 
 def _find_duplicate(topic: TopicExtraction, recent: list[Cookie]) -> Cookie | None:
@@ -80,11 +107,34 @@ def process_news(
     )
     db.upsert_source(conn, source)
 
+    # Dedup check: compare against recent LIVE cookies AND pending
+    # cookies (both are potential duplicates — pending cookies haven't
+    # been promoted yet but should still be deduped against).
     recent = [
         cookie
         for cookie in db.find_recent_cookies(conn, DEDUP_LOOKBACK_DAYS)
         if not cookie.is_duplicate
     ]
+    # Also check pending_cookies for headlines within the lookback window.
+    for row in db.list_pending_cookies(conn, status="pending"):
+        pending_created = datetime.fromisoformat(row["created_at"])
+        cutoff = datetime.now(timezone.utc) - timedelta(days=DEDUP_LOOKBACK_DAYS)
+        if pending_created >= cutoff:
+            recent.append(
+                Cookie(
+                    id=row["id"],
+                    source_ids=_json.loads(row["source_ids"]),
+                    headline=row["headline"],
+                    summary=row["summary"],
+                    why_it_matters=row["why_it_matters"],
+                    significance=row["significance"],
+                    folio_areas=db._load_refs(row["folio_areas"]),
+                    folio_entities=db._load_refs(row["folio_entities"]),
+                    folio_concepts=db._load_refs(row["folio_concepts"]),
+                    unresolved=_json.loads(row["unresolved"]),
+                    created_at=pending_created,
+                )
+            )
     cookies: list[Cookie] = []
     unresolved: list[str] = []
     for topic in topics:
@@ -102,11 +152,21 @@ def process_news(
             is_duplicate=original is not None,
             duplicate_of=original.id if original else None,
         )
-        db.save_cookie(conn, cookie)
+        # Human-in-the-loop: cookies go to the pending review table,
+        # not the live cookies table.  They are promoted to the live
+        # site only after Discord approval or 72h auto-approve.
+        db.save_pending_cookie(
+            conn, cookie, item_type=raw_item.item_type, source_url=raw_item.source_url
+        )
         if original is not None:
             # Duplicates are flagged, not deleted; the new source corroborates
             # the original cookie (PRD sections 2.1, 4.1 step 3).
-            db.link_cookie_source(conn, original.id, source.id)
+            # Link to the ORIGINAL live cookie if it was already promoted,
+            # otherwise skip — the duplicate will be linked on promotion.
+            try:
+                db.link_cookie_source(conn, original.id, source.id)
+            except sqlite3.IntegrityError:
+                pass  # original not yet in live cookies; skip link
         unresolved.extend(topic.unresolved)
         cookies.append(cookie)
 
@@ -180,8 +240,31 @@ def run_source(
         raw_item = zeeker_client.to_raw_item(zeeker_db, table, row)
         watermark = row.get(ts_col)
         if raw_item is None:
-            # No usable text (judgment rows): nothing to store, but the
-            # row is handled — advance the watermark past it.
+            # No usable text (e.g. judgment rows where content_text,
+            # court_summary, and summary are all empty). Two cases:
+            #   1. has_content is falsy — the row genuinely has no text
+            #      and never will. Advance the watermark past it.
+            #   2. has_content is truthy — the row WILL get text later
+            #      (the build pipeline hasn't finished extraction/summary
+            #      yet). Do NOT advance the watermark; the next cycle will
+            #      retry it once the summary is populated.
+            # has_content semantics in the zeeker-judgements build:
+            #   1 (truthy)    — the build has confirmed this row has a
+            #                  judgment body; enrichment (summary) may or
+            #                  may not be complete yet.  Break so the
+            #                  watermark stays behind for retry.
+            #   0 (falsy)     — the build has confirmed there is no
+            #                  judgment body.  Advance the watermark;
+            #                  this row will never produce cookies.
+            #   None / missing — the build has NOT yet processed this row
+            #                  (Phase 2/3 hasn't run).  It WILL get text
+            #                  later.  Break so the watermark stays behind
+            #                  for retry on the next cycle.
+            has_content = row.get("has_content")
+            if has_content != 0 and not dry_run:
+                # Row will have text later — stop processing here so
+                # the watermark stays behind this row for retry.
+                break
             result.skipped += 1
             if not dry_run and watermark is not None:
                 db.set_watermark(conn, zeeker_db, table, str(watermark))

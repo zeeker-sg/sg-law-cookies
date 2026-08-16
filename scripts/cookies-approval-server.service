@@ -1,0 +1,19 @@
+[Unit]
+Description=Cookies approval server — Discord interaction webhook receiver (port 9002)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=overfed
+Group=overfed
+ExecStart=/home/overfed/sg-law-cookies/.venv/bin/python /home/overfed/sg-law-cookies/scripts/cookies-approval-server.py
+WorkingDirectory=/home/overfed/sg-law-cookies
+Environment=HOME=/home/overfed
+Environment=USER=overfed
+Environment=PATH=/home/overfed/sg-law-cookies/.venv/bin:/usr/bin:/home/overfed/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
