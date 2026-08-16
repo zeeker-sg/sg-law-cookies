@@ -382,18 +382,7 @@ class InteractionHandler(BaseHTTPRequestHandler):
         )
         timestamp = self.headers.get("X-Signature-Timestamp", "")
 
-        # Debug: log what we received
-        sys.stderr.write(
-            f"POST {self.path} | sig_len={len(signature)} ts={timestamp!r} "
-            f"body_len={len(body)} | headers: "
-            f"{'X-Ed25519-Signature' in {k for k in self.headers.keys()}} "
-            f"{'X-Signature-Timestamp' in {k for k in self.headers.keys()}}\n"
-        )
-        sys.stderr.flush()
-
         if not verify_discord_signature(body, signature, timestamp):
-            sys.stderr.write(f"  → 401 Invalid signature\n")
-            sys.stderr.flush()
             self.send_response(401)
             self.end_headers()
             self.wfile.write(b"Invalid signature")
