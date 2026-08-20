@@ -199,6 +199,22 @@ def main() -> int:
             cookies_db.set_pending_discord_msg_id(conn, row["id"], msg_id)
             posted += 1
             print(f"  posted: {row['headline'][:60]} → msg {msg_id}")
+            # Auto-create a thread on the cookie embed for comments.
+            # Users can write feedback in the thread; the comment scanner
+            # reads thread replies and queues the cookie for re-ingestion.
+            thread_name = f"💬 Comments — {row['id'][:8]}"
+            thread_body = {"name": thread_name, "auto_archive_duration": 10080}
+            thread_result = discord_request(
+                "POST",
+                f"/channels/{channel_id}/messages/{msg_id}/threads",
+                token,
+                thread_body,
+            )
+            thread_id = thread_result.get("id")
+            if thread_id:
+                print(f"    thread created: {thread_name} → {thread_id}")
+            else:
+                print(f"    WARNING: could not create thread", file=sys.stderr)
         else:
             print(f"  FAILED to post: {row['headline'][:60]}", file=sys.stderr)
 
