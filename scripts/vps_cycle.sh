@@ -103,11 +103,55 @@ else
     JUDGMENT_ACTIVE=false
 fi
 
+DB_PATH="${COOKIES_DB_PATH:-./cookies.db}"
+
 echo "==> backup local DB to S3 (preserve any approved cookies before restore)"
 uv run cookies backup
 
+# ── Preserve discord_msg_id mappings across restore ────────────────
+# The S3 canonical DB may be stale w.r.t. which pending cookies have
+# already been posted to Discord.  Without this, post_pending_cookies
+# re-posts every pending cookie after every vps_cycle, creating
+# duplicate Discord cards and losing track of what's been reviewed.
+# We dump {cookie_id: discord_msg_id} for all pending rows that have
+# a msg_id, then restore them after the S3 pull.
+DISCORD_MSG_MAP=""
+if sqlite3 "$DB_PATH" "SELECT count(*) FROM pending_cookies WHERE discord_msg_id IS NOT NULL" 2>/dev/null | grep -q '[1-9]'; then
+    DISCORD_MSG_MAP=$(mktemp)
+    sqlite3 -json "$DB_PATH" \
+        "SELECT id, discord_msg_id FROM pending_cookies WHERE discord_msg_id IS NOT NULL" \
+        > "$DISCORD_MSG_MAP" 2>/dev/null
+    PRESERVED=$(python3 -c "import json,sys; print(len(json.load(sys.stdin)))" < "$DISCORD_MSG_MAP" 2>/dev/null || echo 0)
+    echo "    preserving $PRESERVED discord_msg_id mapping(s) across restore"
+else
+    echo "    no discord_msg_id mappings to preserve"
+fi
+
 echo "==> restore canonical DB from S3"
 uv run cookies restore
+
+# Re-apply preserved discord_msg_id mappings after restore.
+if [[ -n "$DISCORD_MSG_MAP" && -f "$DISCORD_MSG_MAP" ]]; then
+    uv run python - "$DISCORD_MSG_MAP" <<'PYMSG'
+import json, sqlite3, sys, os
+map_file = sys.argv[1]
+db_path = os.environ.get("COOKIES_DB_PATH", "./cookies.db")
+with open(map_file) as f:
+    rows = json.load(f)
+conn = sqlite3.connect(db_path)
+applied = 0
+for row in rows:
+    cur = conn.execute(
+        "UPDATE pending_cookies SET discord_msg_id = ? WHERE id = ? AND discord_msg_id IS NULL",
+        (row["discord_msg_id"], row["id"]),
+    )
+    applied += cur.rowcount
+conn.commit()
+conn.close()
+print(f"    re-applied {applied} discord_msg_id mapping(s) after restore")
+PYMSG
+    rm -f "$DISCORD_MSG_MAP"
+fi
 
 echo "==> ingest active sources (limit ${LIMIT}/source)"
 uv run python - <<'PY' | while IFS='|' read -r src pipeline; do
