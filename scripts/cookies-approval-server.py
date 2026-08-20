@@ -26,8 +26,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
 import sys
+import threading
 import time
+import urllib.request
+import urllib.error
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
@@ -114,6 +118,161 @@ def get_db_conn():
 
     db_path = os.environ.get("COOKIES_DB_PATH", DEFAULT_DB_PATH) or DEFAULT_DB_PATH
     return cookies_db.init_db(db_path), cookies_db
+
+
+# ── Discord message editing ─────────────────────────────────────────────
+
+
+DISCORD_API = "https://discord.com/api/v10"
+
+# Significance emoji and colours (must match post_pending_cookies.py).
+SIGNIFICANCE_EMOJI = {"high": "🔴", "medium": "🟡", "low": "⚪"}
+ITEM_TYPE_EMOJI = {"news": "📰", "judgment": "⚖️"}
+# Greyed-out colour for actioned cookies (Discord embed colours are ints).
+ACTIONED_COLOR = 0x4E5058  # dark grey
+
+# Status badges prepended to the embed title.
+STATUS_BADGES = {
+    "approved": "✅ APPROVED",
+    "rejected": "🗑️ REJECTED",
+    "edited": "✏️ EDITED",
+    "regenerating": "🔄 REGENERATING",
+}
+
+
+def discord_edit_message(
+    channel_id: str, message_id: str, token: str, body: dict
+) -> bool:
+    """PATCH a Discord message.  Returns True on success."""
+    url = f"{DISCORD_API}/channels/{channel_id}/messages/{message_id}"
+    data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        method="PATCH",
+        headers={
+            "Authorization": f"Bot {token}",
+            "Content-Type": "application/json",
+            "User-Agent": "DiscordBot (https://zeeker.sg, 1.0)",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.status in (200, 204)
+    except urllib.error.HTTPError as exc:
+        err_body = exc.read().decode("utf-8", errors="replace")
+        print(
+            f"  discord_edit_message error {exc.code}: {err_body[:300]}",
+            file=sys.stderr,
+        )
+        return False
+    except Exception as exc:
+        print(f"  discord_edit_message failed: {exc}", file=sys.stderr)
+        return False
+
+
+def update_discord_message_status(
+    channel_id: str,
+    message_id: str,
+    token: str,
+    action: str,
+    reviewer: str,
+    reason: str | None = None,
+) -> bool:
+    """Edit the original cookie embed to show its actioned status.
+
+    - Greys out the embed colour.
+    - Prepends a status badge to the title.
+    - Removes the Approve / Reject / Edit buttons (empty components list).
+    - Adds a footer line showing who actioned it and when.
+    """
+    # Fetch the original message to get the existing embed.
+    url = f"{DISCORD_API}/channels/{channel_id}/messages/{message_id}"
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={
+            "Authorization": f"Bot {token}",
+            "User-Agent": "DiscordBot (https://zeeker.sg, 1.0)",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            msg = json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:
+        print(f"  fetch original message failed: {exc}", file=sys.stderr)
+        return False
+
+    embeds = msg.get("embeds", [])
+    if not embeds:
+        return False
+
+    embed = embeds[0]  # only one embed per cookie message
+
+    # Prepend status badge to title.
+    badge = STATUS_BADGES.get(action, action.upper())
+    original_title = embed.get("title", "")
+    # Strip any existing badge prefix (in case of re-edits).
+    for b in STATUS_BADGES.values():
+        if original_title.startswith(b + " "):
+            original_title = original_title[len(b) + 1 :]
+    embed["title"] = f"{badge} {original_title}"
+
+    # Grey out the embed colour.
+    embed["color"] = ACTIONED_COLOR
+
+    # Update footer with reviewer + timestamp.
+    ts = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime())
+    footer_text = f"{badge} by {reviewer} • {ts}"
+    if reason:
+        footer_text += f" • reason: {reason[:100]}"
+    embed["footer"] = {"text": footer_text[:300]}
+
+    # Send the edit with empty components (removes buttons).
+    body = {"embeds": [embed], "components": []}
+    return discord_edit_message(channel_id, message_id, token, body)
+
+
+def _get_discord_token() -> str | None:
+    """Get the Discord bot token from environment."""
+    return os.environ.get("DISCORD_BOT_TOKEN")
+
+
+def _get_review_channel_id() -> str | None:
+    """Get the review channel ID from environment."""
+    return os.environ.get("DISCORD_REVIEW_CHANNEL")
+
+
+# ── Comment scanner trigger ────────────────────────────────────────────
+
+
+def _trigger_comment_scanner(cookie_id: str) -> None:
+    """Run comment_triggered_ingest.py for a single cookie in a background thread.
+
+    Called after an Edit modal submit — scans that cookie's thread for
+    human comments and queues re-ingestion if any are found.
+    """
+    script = str(Path(__file__).resolve().parent / "comment_triggered_ingest.py")
+    project_dir = str(Path(__file__).resolve().parent.parent)
+
+    def _run():
+        try:
+            result = subprocess.run(
+                ["python3", script, "--cookie-id", cookie_id],
+                cwd=project_dir,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ},
+            )
+            if result.stdout:
+                print(f"[comment-scanner] {result.stdout.strip()}", file=sys.stderr)
+            if result.returncode != 0 and result.stderr:
+                print(f"[comment-scanner ERROR] {result.stderr.strip()}", file=sys.stderr)
+        except Exception as exc:
+            print(f"[comment-scanner] failed to run: {exc}", file=sys.stderr)
+
+    threading.Thread(target=_run, daemon=True).start()
 
 
 # ── Discord interaction responses ─────────────────────────────────────
@@ -216,13 +375,25 @@ def _modal_response(cookie_id: str, action: str) -> dict:
     return {}
 
 
-def handle_button_click(interaction: dict, user_id: str) -> tuple[bytes, int]:
-    """Handle a button click interaction (approve/reject/edit)."""
+def handle_button_click(
+    interaction: dict, user_id: str, username: str = "unknown"
+) -> tuple[bytes, int]:
+    """Handle a button click interaction (approve/reject/edit).
+
+    After a successful action, edits the original Discord message to
+    show the actioned status (badge in title, grey colour, buttons removed).
+    """
     data = interaction.get("data", {})
     custom_id = data.get("custom_id", "")
     parts = custom_id.split(":", 1)
     action = parts[0]
     cookie_id = parts[1] if len(parts) > 1 else ""
+
+    # Get the original message ID + channel ID for editing.
+    msg_id = interaction.get("message", {}).get("id")
+    channel_id = interaction.get("channel_id")
+    token = _get_discord_token()
+    review_channel = _get_review_channel_id() or channel_id
 
     if action == "approve":
         conn, cookies_db = get_db_conn()
@@ -233,6 +404,11 @@ def handle_button_click(interaction: dict, user_id: str) -> tuple[bytes, int]:
                     "type": 4,
                     "data": {"content": f"❌ Cookie {cookie_id[:8]} not found.", "flags": 64},
                 })
+            # Edit the original Discord message to show approved status.
+            if msg_id and channel_id and token:
+                update_discord_message_status(
+                    channel_id, msg_id, token, "approved", username
+                )
             return _resp({
                 "type": 4,
                 "data": {
@@ -250,6 +426,7 @@ def handle_button_click(interaction: dict, user_id: str) -> tuple[bytes, int]:
 
     elif action == "reject":
         # Open a modal for the rejection reason.
+        # Store msg_id/channel_id for later use after modal submit.
         modal = _modal_response(cookie_id, "reject")
         return _resp(modal)
 
@@ -263,13 +440,26 @@ def handle_button_click(interaction: dict, user_id: str) -> tuple[bytes, int]:
     })
 
 
-def handle_modal_submit(interaction: dict, user_id: str) -> tuple[bytes, int]:
-    """Handle a modal submission (reject reason or edit text)."""
+def handle_modal_submit(
+    interaction: dict, user_id: str, username: str = "unknown"
+) -> tuple[bytes, int]:
+    """Handle a modal submission (reject reason or edit text).
+
+    After a successful action, edits the original Discord message to
+    show the actioned status.
+    """
     data = interaction.get("data", {})
     custom_id = data.get("custom_id", "")
     parts = custom_id.split(":", 1)
     action = parts[0]
     cookie_id = parts[1] if len(parts) > 1 else ""
+
+    # Get the original message ID + channel ID for editing.
+    # For MODAL_SUBMIT, the message field contains the message that
+    # the button was on.
+    msg_id = interaction.get("message", {}).get("id")
+    channel_id = interaction.get("channel_id")
+    token = _get_discord_token()
 
     # Extract modal component values
     submitted: dict[str, str] = {}
@@ -284,6 +474,16 @@ def handle_modal_submit(interaction: dict, user_id: str) -> tuple[bytes, int]:
             status = cookies_db.reject_pending_cookie(
                 conn, cookie_id, reason, rejected_by=user_id
             )
+            # Edit the original Discord message.
+            if msg_id and channel_id and token:
+                if status == "rejected":
+                    update_discord_message_status(
+                        channel_id, msg_id, token, "rejected", username, reason=reason
+                    )
+                else:
+                    update_discord_message_status(
+                        channel_id, msg_id, token, "regenerating", username, reason=reason
+                    )
             if status == "rejected":
                 return _resp({
                     "type": 4,
@@ -325,6 +525,14 @@ def handle_modal_submit(interaction: dict, user_id: str) -> tuple[bytes, int]:
                 summary=summary or None,
                 why_it_matters=why_it_matters or None,
             )
+            # Edit the original Discord message to show edited status.
+            if msg_id and channel_id and token:
+                update_discord_message_status(
+                    channel_id, msg_id, token, "edited", username
+                )
+            # Trigger comment scanner for this cookie — collect any
+            # thread comments and queue re-ingestion if found.
+            _trigger_comment_scanner(cookie_id)
             return _resp({
                 "type": 4,
                 "data": {
@@ -398,6 +606,7 @@ class InteractionHandler(BaseHTTPRequestHandler):
         interaction_type = interaction.get("type")
         user = interaction.get("member", {}).get("user", {})
         user_id = user.get("id", "unknown")
+        username = user.get("global_name") or user.get("username") or "unknown"
 
         # Type 1: PING — Discord verifies the endpoint is alive.
         if interaction_type == 1:
@@ -411,7 +620,7 @@ class InteractionHandler(BaseHTTPRequestHandler):
 
         # Type 3: MESSAGE_COMPONENT (button click)
         if interaction_type == 3:
-            response, status = handle_button_click(interaction, user_id)
+            response, status = handle_button_click(interaction, user_id, username)
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(response)))
@@ -421,7 +630,7 @@ class InteractionHandler(BaseHTTPRequestHandler):
 
         # Type 5: MODAL_SUBMIT
         if interaction_type == 5:
-            response, status = handle_modal_submit(interaction, user_id)
+            response, status = handle_modal_submit(interaction, user_id, username)
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(response)))
