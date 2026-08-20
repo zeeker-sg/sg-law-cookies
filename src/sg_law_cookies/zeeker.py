@@ -188,7 +188,16 @@ class ZeekerClient:
             if elapsed < self._min_interval:
                 time.sleep(self._min_interval - elapsed)
             self._last_request = time.monotonic()
-            response = self._client.get(url, params=params)
+            try:
+                response = self._client.get(url, params=params)
+            except httpx.TransportError:
+                # Connection refused, reset, timeout, etc. — e.g. the
+                # datasette container is mid-restart. Retry with the same
+                # exponential backoff as 5xx responses.
+                if attempt < self._max_retries:
+                    time.sleep(self._backoff * (2**attempt))
+                    continue
+                raise
             if response.status_code in RETRY_STATUSES and attempt < self._max_retries:
                 time.sleep(self._backoff * (2**attempt))
                 continue
