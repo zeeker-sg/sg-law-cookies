@@ -91,13 +91,13 @@ suppressed. Significance determines prominence, not inclusion.
 |-------|------------|--------------------|
 | High | Creates new legal obligations, changes existing law, introduces a new statutory framework. | Displayed prominently in constellation. Named in daily digest. Triggers push notifications for subscribers. |
 | Medium | Updates or clarifies existing rules, adjusts thresholds, extends existing schemes. | Visible in constellation with labels on hover. Included in topic-filtered notifications. |
-| Low | Commentary, market data, general interest, routine proceedings. | Present as dots in constellation. Searchable in archives and MCP. Not in digest or notifications unless user explicitly opts in. |
+| Low | Commentary, market data, general interest, routine proceedings. | Present as dots in constellation. Searchable in archives and via zeeker-mcp. Not in digest or notifications unless user explicitly opts in. |
 
 **Significance is the pipeline's first-pass estimate.** The
 personalisation layer overrides it: a low-significance PDPC
 enforcement action becomes high-significance to a data protection
 lawyer through their subscription. Over time, usage data (clicks,
-MCP queries, references by later cookies) provides a feedback
+zeeker-mcp queries, references by later cookies) provides a feedback
 signal for improving significance ratings.
 
 ### 2.4 Shelf Life
@@ -116,7 +116,7 @@ Two dimensions to consider for future development:
 
 ### 2.5 Attribution and Linking
 
-Two rules apply across every channel (site, email, MCP):
+Two rules apply across every channel (site, email, zeeker-mcp):
 
 1. **Attribute Zeeker.** Cookies are derived from data.zeeker.sg.
    Every surface that displays cookies carries a visible
@@ -162,9 +162,9 @@ Two rules apply across every channel (site, email, MCP):
         ┌─────────────┼─────────────────┐
         │             │                 │
   ┌─────▼────┐  ┌────▼─────┐   ┌──────▼──────┐
-  │  Blog /  │  │  Email   │   │  MCP        │
-  │  Constel-│  │  Digest  │   │  Endpoint   │
-  │  lation  │  │          │   │             │
+  │  Blog /  │  │  Email   │   │  zeeker-mcp │
+  │  Constel-│  │  Digest  │   │  (mcp.      │
+  │  lation  │  │          │   │   zeeker.sg)│
   └──────────┘  └──────────┘   └─────────────┘
         │             │                 │
         ▼             ▼                 ▼
@@ -184,7 +184,7 @@ idempotent across re-runs.
 
 **Catalogue discovery.** Zeeker is actively expanding. At the start
 of each run, the client enumerates Zeeker's databases and tables
-(both the MCP and the underlying Datasette JSON API expose this)
+(both zeeker-mcp and the underlying Datasette JSON API expose this)
 and diffs the result against a local source registry. Known sources
 carry a pipeline routing (news or judgment), a licence, and a
 watermark. A newly appeared database or table is logged and
@@ -210,7 +210,7 @@ trivial because the hard work is done upstream.
 
 | Component | Choice | Rationale |
 |-----------|--------|-----------|
-| Data source | data.zeeker.sg (Datasette JSON API / MCP) | A catalogue that indexes and points at sources, not a republisher. Self-describing, so new databases are auto-discoverable. Underlying source licences vary per database — captured at ingest. One client replaces all per-source scrapers. This project is the showcase consumer. |
+| Data source | data.zeeker.sg (Datasette JSON API / zeeker-mcp) | A catalogue that indexes and points at sources, not a republisher. Self-describing, so new databases are auto-discoverable. Underlying source licences vary per database — captured at ingest. One client replaces all per-source scrapers. This project is the showcase consumer. |
 | Language | Python, end-to-end | Single codebase for pipeline, site generation, and distribution. |
 | Package management | uv | Fast, modern, already in use in current repo. |
 | LLM | Anthropic API with tool use (primary); Ollama structured outputs (local alternative) | Both enforce the same JSON schema, so backends are interchangeable. Ollama (e.g. gemma4:26b) enables free local/dev runs — disable thinking traces, which are prohibitively slow at local token speeds. |
@@ -218,9 +218,9 @@ trivial because the hard work is done upstream.
 | Database | SQLite + sqlite-vec | No database server. Full query capability. Embedding search for dedup. |
 | Ontology | FOLIO (openlegalstandard.org) | 18,000+ standardised concepts. CC-BY licensed. Python library and public API. MCP server available. |
 | Static site | Jinja2 templates or lightweight framework | Replaces Hugo. Keeps everything in Python. |
-| Orchestration host | Small VPS with cron | Runs the daily pipeline, holds the SQLite database, serves the MCP endpoint, pushes static output to the static host. |
+| Orchestration host | Small VPS with cron | Runs the daily pipeline, holds the SQLite database, pushes static output to the static host. The MCP endpoint is served by the existing zeeker-mcp service (no separate MCP host needed). |
 | Visualisation | D3.js with d3-force | Force-directed constellation layout. Static JSON data files generated by pipeline. |
-| Hosting | Cloudflare Pages at **cookies.zeeker.sg** + VPS (MCP endpoint) | Static site on a zeeker.sg subdomain — the showcase relationship in the hostname. Live queries served from the VPS. |
+| Hosting | Cloudflare Pages at **cookies.zeeker.sg** + zeeker-mcp at **mcp.zeeker.sg** | Static site on a zeeker.sg subdomain — the showcase relationship in the hostname. MCP queries are served by the existing zeeker-mcp service, which exposes `sg-law-cookies` as a first-class database alongside `zeeker-judgements`, `pdpc`, `sg-gov-newsrooms`, and `sglawwatch`. |
 
 ---
 
@@ -308,7 +308,7 @@ then a merge step reconciles and deduplicates the partial extractions.
 identified in Step 2, extract the relevant portion of the judgment
 text and produce a focused summary: what was the question, what did
 the court decide, and what was the core reasoning. This is the
-richest layer of data and powers deep queries via MCP.
+richest layer of data and powers deep queries via zeeker-mcp.
 
 **Step 4 — Cookie Generation.** A separate LLM call that receives
 the *structured data from Steps 2–3* (not the raw judgment text)
@@ -447,7 +447,7 @@ DailyStats:
 Subscription:                  # owned by the external subscription app
     user_id:          str
     folio_area_iris:  list[str]
-    preferred_channel: "email" | "telegram" | "mcp"
+    preferred_channel: "email" | "telegram" | "zeeker-mcp"
     min_significance: "high" | "medium" | "low"
 ```
 
@@ -524,19 +524,58 @@ cookies — add Banking & Finance to your profile?"
 
 ### 6.3 MCP Endpoint
 
-**Format:** Structured query interface for developers and power users.
+**Status:** **Live.** SG Law Cookies is served as a first-class database
+through the existing **zeeker-mcp** service at `https://mcp.zeeker.sg/mcp/`.
+No separate MCP server was built for this project — the cookies database
+was registered in zeeker-mcp's config (PR #16, merged 2026-08-16) and
+inherits all of zeeker-mcp's existing infrastructure: BM25 search ranking,
+RRF merge, content-license policies, provenance envelopes, rate limiting,
+and injection-resistance. The MCP endpoint is the fourth distribution
+channel to go live (after the blog, RSS, and the underlying Datasette
+JSON API on data.zeeker.sg).
+
+**Implementation:** zeeker-mcp exposes `sg-law-cookies` with four
+searchable tables:
+
+| Table | FTS-indexed columns | Search preview | Content policy |
+|-------|---------------------|----------------|----------------|
+| `cookies` | headline, summary, why_it_matters | headline / summary / source_url | CC-BY-4.0 (allowed) |
+| `judgment_issues` | question, holding, reasoning | question / holding / source_url | Crown Copyright (process-only) |
+| `judgments` | case_name, orders | case_name / citation / source_url | Crown Copyright (process-only) |
+| `unresolved_terms` | term | (suppressed from search — taxonomy reference) | — |
+
+All tables are accessible via zeeker-mcp's three tools: `search` (cross-DB
+full-text), `query_table` (structured filtering), and `fetch` (URL-keyed
+retrieval). The `describe_table` and `list_databases` discovery tools also
+cover `sg-law-cookies`.
+
+**Format:** Structured query interface for developers and power users,
+delivered via MCP protocol (version `2025-06-18`).
 
 **Capabilities:**
-- Query by FOLIO concept IRI, date range, significance level
-- Full-text search across cookie summaries
-- Judgment-specific queries: by court, citation, legislation, cases cited
-- Return cookies with full metadata including FOLIO references
-- Cross-reference queries: "what cases cite this case?"
+- Cross-database full-text search across cookies, judgment issues, and
+  judgment metadata (BM25-ranked, RRF-merged)
+- Query by date range, significance level, primary area, item type
+  via `query_table`
+- URL-keyed retrieval of full cookie records (including `why_it_matters`,
+  FOLIO tags) via `fetch`
+- Citation synthesis: each returned row carries a `_citation` field with
+  a formatted citation string
+- Provenance and content-license metadata attached to every response
 
-**Example queries:**
-- "What judgments in the last 30 days dealt with contractual interpretation?"
-- "Were there any PDPC enforcement actions this week?"
-- "Show me all high-significance employment cookies since January."
+**Example queries (via any MCP-compatible client):**
+- Connect to `https://mcp.zeeker.sg/mcp` and call `search` with
+  `databases=["sg-law-cookies"]` for topical queries
+- `query_table(database="sg-law-cookies", table="cookies")` with filters
+  for `significance="high"` or `date` ranges
+- `fetch(database="sg-law-cookies", table="cookies", url="<source_url>")`
+  for the full record including FOLIO tags and `why_it_matters`
+
+**Attribution:** Every response carries Zeeker provenance
+(`Zeeker (zeeker.sg) — curated Singapore legal datasets`) and the
+per-table content-license policy. Cookies (CC-BY-4.0) are redistribution-
+allowed; judgment-derived tables are process-only (Crown Copyright
+Singapore, eLitigation).
 
 ### 6.4 Additional Channels (Future)
 
@@ -833,13 +872,20 @@ the separate subscription app once it reaches production.
   directly from the pipeline if demand arrives before the app ships
 - **Deliverable:** Second distribution channel. Highest-ROI channel for legal audience.
 
-### Phase 8 — MCP Endpoint
+### Phase 8 — MCP Endpoint ✅ (Completed 2026-08-16)
 **Goal:** Structured query interface for power users.
-- API design: query by FOLIO concept, date range, significance, court, citation
-- Full-text search across cookie summaries
-- Cross-reference queries (citation graph)
-- MCP protocol implementation
-- **Deliverable:** SG Law Cookies as a legal research tool, not just a news feed.
+- ~~API design: query by FOLIO concept, date range, significance, court, citation~~
+- ~~Full-text search across cookie summaries~~
+- ~~Cross-reference queries (citation graph)~~
+- ~~MCP protocol implementation~~
+- **Implementation:** No standalone MCP server was built. Instead, `sg-law-cookies`
+  was registered as a fifth first-class database in the existing zeeker-mcp
+  connector (PR #16, commit `8bd6ec5`, merged 2026-08-16). Config-only integration
+  — zero new code paths in zeeker-mcp. All four content tables (cookies,
+  judgment_issues, judgments, unresolved_terms) are searchable via BM25-ranked
+  full-text search, queryable via `query_table`, and retrievable via `fetch`.
+  Live at `https://mcp.zeeker.sg/mcp/` since 2026-08-16.
+- **Deliverable:** ✅ SG Law Cookies as a legal research tool, not just a news feed.
 
 ### Phase 9 — Weekly/Monthly Rollups
 **Goal:** Auto-generated synthesis of weekly and monthly trends.
