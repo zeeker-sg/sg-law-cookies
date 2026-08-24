@@ -13,9 +13,15 @@ against the hosted FOLIO REST API at folio.openlegalstandard.org:
   candidate label shares a token with the query.
 - GET /taxonomy/tree/path/<id>  — path from root, used to derive the branch
   of a matched concept.
+
+When the FOLIO_RESOLVE env var is truthy, resolution is delegated to the
+folio-resolve adapter (folio_resolve_adapter.py) which uses an in-memory
+ontology and the folio-resolve MatchPipeline instead of per-query REST calls.
 """
 
 from __future__ import annotations
+
+import os
 
 import httpx
 from pydantic import BaseModel
@@ -23,6 +29,11 @@ from pydantic import BaseModel
 from sg_law_cookies.area_vocab import AREA_IRI_BY_LABEL
 from sg_law_cookies.models import FolioRef, JudgmentMeta, TopicExtraction
 from sg_law_cookies.sg_mappings import lookup_sg_entity
+
+
+def _use_folio_resolve() -> bool:
+    """Check whether the folio-resolve adapter is enabled (env flag)."""
+    return bool(os.environ.get("FOLIO_RESOLVE", "").lower() in {"true", "1", "yes", "on"})
 
 FOLIO_API_BASE = "https://folio.openlegalstandard.org"
 CONFIDENCE_THRESHOLD = 0.6
@@ -149,6 +160,10 @@ def pick_best_match(
 def resolve_topic(topic: TopicExtraction, client: httpx.Client) -> TopicExtraction:
     """Resolve a topic's free-text labels to FOLIO IRIs (three passes)."""
 
+    if _use_folio_resolve():
+        from sg_law_cookies.folio_resolve_adapter import resolve_topic as _resolve
+        return _resolve(topic, client)
+
     # Pass 1: areas of law. The model selects from the closed FOLIO area
     # vocabulary (area_vocab.AREA_LABELS), so resolution is an exact-label
     # lookup with no network call. An unknown label (e.g. a backend ignoring
@@ -266,6 +281,9 @@ def resolve_venue(client: httpx.Client, court_name: str) -> FolioRef:
     Non-Singapore courts still resolve via FOLIO. Always returns a FolioRef;
     on no match or API failure it degrades to an unresolved placeholder.
     """
+    if _use_folio_resolve():
+        from sg_law_cookies.folio_resolve_adapter import resolve_venue as _resolve
+        return _resolve(client, court_name)
     local = lookup_sg_entity(court_name)
     if local:
         return local
@@ -287,6 +305,11 @@ def resolve_legislation(client: httpx.Client, name: str) -> FolioRef:
     they fall back to the local Singapore table, then to an unresolved
     placeholder. Never raises on API failure.
     """
+    if _use_folio_resolve():
+        from sg_law_cookies.folio_resolve_adapter import (
+            resolve_legislation as _resolve,
+        )
+        return _resolve(client, name)
     local = lookup_sg_entity(name)
     if local:
         return local
@@ -328,6 +351,11 @@ def resolve_judgment_meta(client: httpx.Client, meta: JudgmentMeta) -> JudgmentM
     Never raises on API failure: every lookup degrades to an unresolved
     placeholder, exactly like the news path (PRD 4.3, 8.2).
     """
+    if _use_folio_resolve():
+        from sg_law_cookies.folio_resolve_adapter import (
+            resolve_judgment_meta as _resolve,
+        )
+        return _resolve(client, meta)
     if meta.court is not None and meta.court.iri is None:
         meta.court = resolve_venue(client, meta.court.preferred_label)
 

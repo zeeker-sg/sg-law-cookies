@@ -193,6 +193,18 @@ wheels = [
 ]
 
 [[package]]
+name = "folio-resolve"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f7/4e/65500d62cd6a20ffb419101e3f76854d332085da7c1a086911614bdd45a3/folio_resolve-0.4.0.tar.gz", hash = "sha256:dfe45082d5f0b71b25bfe750bff2161516458a4ef0656a5838448c2f2df34257", size = 617512, upload-time = "2026-08-09T16:32:21.069Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/69/d4/1265dbf7db5cf2616c45115449f5cd543275af8d86ebde66e8e09a6fab71/folio_resolve-0.4.0-py3-none-any.whl", hash = "sha256:1617b00dd07dbff5a439e3098e908a3b8f3c12a2bb0f24018503a6df09ca7c09", size = 67142, upload-time = "2026-08-09T16:32:19.316Z" },
+]
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -623,6 +635,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "boto3" },
+    { name = "folio-resolve" },
     { name = "httpx" },
     { name = "jinja2" },
     { name = "pydantic" },
@@ -639,6 +652,7 @@ dev = [
 requires-dist = [
     { name = "anthropic", specifier = ">=0.40" },
     { name = "boto3", specifier = ">=1.43.28" },
+    { name = "folio-resolve", specifier = ">=0.4.0" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "pydantic", specifier = ">=2.7" },
