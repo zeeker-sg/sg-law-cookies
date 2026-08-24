@@ -224,9 +224,15 @@ def mark_embed_regenerating(
     embed["color"] = ACTIONED_COLOR
 
     # Footer with reviewer + comment excerpt + timestamp.
+    # Preserve the original Cookie ID in the footer so the scanner
+    # can still find this embed on subsequent scans.
+    old_footer = embed.get("footer", {}).get("text", "")
+    cookie_id_match = COOKIE_ID_RE.search(old_footer)
     ts = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime())
     comment_short = comment[:150]
     footer_text = f"🔄 Comment by {reviewer} • {ts} • {comment_short}"
+    if cookie_id_match:
+        footer_text += f" • Cookie ID: {cookie_id_match.group(1)}"
     embed["footer"] = {"text": footer_text[:300]}
 
     body = {"embeds": [embed], "components": []}
