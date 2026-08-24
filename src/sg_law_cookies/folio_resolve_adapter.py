@@ -1,21 +1,22 @@
-"""Adapter: route FOLIO resolution through folio-resolve (Phase 0 spike).
+"""Adapter: route FOLIO resolution through folio-resolve (Phase 0 spike, Option C).
 
 When the ``FOLIO_RESOLVE`` env var is truthy, ``resolve_topic`` and
 ``resolve_judgment_meta`` delegate here instead of using the legacy REST
 API search/match layer in ``folio.py``.
 
-Design:
-- Areas of law: still resolved from the closed vocabulary (``area_vocab``),
-  same as the legacy path — no pipeline needed.
-- Singapore entities: still resolved from ``sg_mappings.py`` first, same
-  as the legacy path.
-- Everything else (concepts, entities, venues, legislation): resolved
-  through a folio-resolve ``MatchPipeline`` backed by an
-  ``InMemoryOntology`` populated from the FOLIO REST API at startup.
+Option C — hybrid approach:
+- Keep the per-query REST API pattern (no bulk ontology fetch).
+- Implement a custom ``OntologyProvider`` that wraps the FOLIO REST API's
+  ``/search/label`` endpoint. Each query hits the API, returns candidates
+  with scores, and the ``MatchPipeline``'s gates, blocklist, and scoring
+  refine them.
+- Get folio-resolve's matching intelligence (word-order-invariant scoring,
+  place-name gates, short-label gates, alias blocklist, span decomposition)
+  on top of the same API data the legacy path uses.
 
-The ontology is fetched once (all branches, all concepts) and cached
-for the process lifetime. This replaces per-query REST calls with
-in-memory matching — the core architectural shift folio-resolve brings.
+The provider caches API responses per query (same as legacy ``_search_cache``).
+The pipeline is built once and reused — the provider handles per-query API
+calls, so the pipeline doesn't need a pre-loaded ontology.
 
 Scores from folio-resolve are 0-100; our FolioRef.confidence is 0.0-1.0.
 We normalise by dividing by 100.
@@ -27,9 +28,10 @@ import logging
 import httpx
 from folio_resolve import (
     Concept,
-    InMemoryOntology,
+    LabelInfo,
     MatchCandidate,
     MatchPipeline,
+    OntologyProvider,
     PlaceNameGate,
 )
 
@@ -52,9 +54,6 @@ _SCORE_SCALE = 100.0
 
 # folio-resolve's default score_floor is 45.0. We convert our 0.6
 # confidence threshold to the 0-100 scale to filter candidates.
-# But score_floor operates inside the pipeline (drops candidates below it
-# before returning). We set it to match our threshold so the pipeline
-# does the filtering.
 _SCORE_FLOOR = CONFIDENCE_THRESHOLD * _SCORE_SCALE  # 60.0
 
 # Singapore place names to add to the PlaceNameGate. Prevents
@@ -66,106 +65,120 @@ _SG_PLACE_TOKENS: frozenset[str] = frozenset({
     "serangoon", "punggol", "sengkang", "yishun", "katong",
 })
 
-# Branch filter: folio-resolve matches across all branches by default.
-# Our legacy code routes venue queries to forums_venues and legislation
-# to legal_authorities. We replicate this by filtering the ontology
-# to the relevant branch subset for those queries.
 
-# Cache the pipeline for the process lifetime.
-_pipeline: MatchPipeline | None = None
-_ontology: InMemoryOntology | None = None
+# ── Custom OntologyProvider wrapping the FOLIO REST API ────────────
 
 
-def _fetch_all_concepts(client: httpx.Client) -> list[Concept]:
-    """Fetch all concepts from the FOLIO REST API across all branches.
+class RestApiOntologyProvider:
+    """An OntologyProvider that queries the FOLIO REST API per query.
 
-    Uses /search/label with a broad query to populate the in-memory
-    ontology. The FOLIO API does not have a "list all" endpoint, so we
-    harvest via branch-filtered /search/query calls for each known
-    branch, plus a broad /search/label sweep.
+    Implements the OntologyProvider Protocol (all_labels, search_by_label,
+    get_concept) by calling the live FOLIO REST API. Results are cached
+    per query for the process lifetime — same as the legacy _search_cache.
 
-    For the spike, we use /search/label with single-letter queries to
-    sweep the ontology. This is a rough approach — Phase 1 will refine
-    this (likely via folio-python or a cached snapshot).
+    The MatchPipeline calls ``search_by_label`` in its _filter stage.
+    The candidates returned here are then run through the pipeline's
+    gates, blocklist, and scoring before reaching the consumer.
     """
-    concepts: list[Concept] = []
-    seen_iris: set[str] = set()
 
-    # Known FOLIO branches (from PRD and folio.py).
-    branches = [
-        "areas_of_law",
-        "forums_venues",
-        "legal_authorities",
-        "objectives",
-        "elements",
-        "services",
-        "legal_information",
-        "persons",
-    ]
+    def __init__(self, client: httpx.Client) -> None:
+        self._client = client
+        self._search_cache: dict[str, list[tuple[Concept, float]]] = {}
+        self._concept_cache: dict[str, Concept] = {}
 
-    for branch in branches:
+    def search_by_label(
+        self, query: str, *, limit: int = 20
+    ) -> list[tuple[Concept, float]]:
+        """Search the FOLIO API for labels matching the query.
+
+        Uses GET /search/label?query=<q> which returns fuzzy matches
+        across all branches with scores on a 0-100 scale. The API has
+        a junk floor around 90, so raw scores are only trusted when the
+        candidate label shares a token with the query — but the
+        MatchPipeline's gates handle this filtering, not us.
+        """
+        key = query.lower().strip()
+        if key in self._search_cache:
+            return self._search_cache[key]
+
+        results: list[tuple[Concept, float]] = []
+        if len(query.strip()) < 2:
+            self._search_cache[key] = results
+            return results
+
         try:
-            resp = client.get(
-                f"{FOLIO_API_BASE}/search/query",
-                params={"label": "*", "branch": branch, "limit": 500},
+            resp = self._client.get(
+                f"{FOLIO_API_BASE}/search/label", params={"query": query}
             )
             resp.raise_for_status()
-            classes = resp.json().get("classes", [])
+            raw = resp.json().get("results", [])
         except (httpx.HTTPError, ValueError) as exc:
-            logger.warning("FOLIO branch %s fetch failed: %s", branch, exc)
-            continue
-        for cls in classes:
+            logger.warning("FOLIO search/label failed for %r: %s", query, exc)
+            self._search_cache[key] = results
+            return results
+
+        for cls, api_score in raw:
             iri = cls.get("iri")
             label = cls.get("label")
-            if not iri or not label or iri in seen_iris:
+            if not iri or not label:
                 continue
-            seen_iris.add(iri)
-            concepts.append(
-                Concept(
-                    iri=iri,
-                    label=label,
-                    branch=branch,
-                    alternative_labels=tuple(cls.get("alternative_labels", [])),
-                )
+            score = float(api_score)
+            # Derive branch from the taxonomy path (lazy, cached).
+            branch = self._branch_for_iri(iri)
+            concept = Concept(
+                iri=iri,
+                label=label,
+                branch=branch,
+                alternative_labels=tuple(cls.get("alternative_labels", [])),
             )
+            self._concept_cache[iri] = concept
+            results.append((concept, score))
 
-    logger.info("Fetched %d concepts from FOLIO API", len(concepts))
-    return concepts
+        # Sort by score descending, then IRI for determinism
+        results.sort(key=lambda pair: (-pair[1], pair[0].iri))
+        results = results[:limit]
+        self._search_cache[key] = results
+        return results
+
+    def all_labels(self) -> dict[str, LabelInfo]:
+        """Return all labels — not practical for a REST API provider.
+
+        The MatchPipeline only calls this if the entity_ruler is enabled.
+        We don't use the entity_ruler in the spike, so this returns an
+        empty dict. Phase 1 can populate it from a cached snapshot.
+        """
+        return {}
+
+    def get_concept(self, iri: str) -> Concept | None:
+        """Get a concept by IRI from the cache, or None."""
+        return self._concept_cache.get(iri)
+
+    def _branch_for_iri(self, iri: str) -> str:
+        """Derive the taxonomy branch of a concept from its path to root."""
+        # For the spike, we use a simplified branch derivation.
+        # The legacy code calls /taxonomy/tree/path/<id> which adds
+        # an extra API call per concept. We skip it here — the pipeline's
+        # branch filtering for venues/legislation uses a different mechanism
+        # (the adapter filters candidates by branch before returning).
+        # For concepts/entities, branch is informational, not functional.
+        return ""
+
+
+# ── Pipeline construction ─────────────────────────────────────────
+
+_pipeline: MatchPipeline | None = None
+_provider: RestApiOntologyProvider | None = None
 
 
 def _build_pipeline(client: httpx.Client) -> MatchPipeline:
-    """Build and cache a MatchPipeline from the FOLIO REST API."""
-    global _pipeline, _ontology
+    """Build and cache a MatchPipeline with a REST API provider."""
+    global _pipeline, _provider
     if _pipeline is not None:
         return _pipeline
 
-    concepts = _fetch_all_concepts(client)
-    if not concepts:
-        # Fallback: at least load the area vocab concepts so the
-        # pipeline isn't empty. This means concepts/entities won't
-        # resolve, but areas still work (they bypass the pipeline).
-        logger.warning(
-            "No concepts fetched from FOLIO API; "
-            "falling back to area-vocab-only ontology"
-        )
-        concepts = [
-            Concept(iri=iri, label=label, branch=AREAS_OF_LAW_BRANCH)
-            for label, iri in AREA_IRI_BY_LABEL.items()
-        ]
-
-    # Also include area vocab concepts (they may not appear in the
-    # /search/query results due to API pagination/limits).
-    area_iris = {iri for iri in AREA_IRI_BY_LABEL.values()}
-    existing_iris = {c.iri for c in concepts}
-    for label, iri in AREA_IRI_BY_LABEL.items():
-        if iri not in existing_iris:
-            concepts.append(
-                Concept(iri=iri, label=label, branch=AREAS_OF_LAW_BRANCH)
-            )
-
-    _ontology = InMemoryOntology(concepts)
+    _provider = RestApiOntologyProvider(client)
     _pipeline = MatchPipeline(
-        ontology=_ontology,
+        ontology=_provider,
         place_gate=PlaceNameGate(
             extra_tokens=_SG_PLACE_TOKENS,
             extra_markers=("republic of", "city of"),
@@ -198,14 +211,112 @@ def _resolve_via_pipeline(
     candidates = pipe.match(term)
 
     # Filter by branch if specified (venue/legislation routing).
+    # The pipeline doesn't know about FOLIO's branch labels — it gets
+    # whatever the provider returns. We set branch="" in the provider,
+    # so branch filtering is a no-op for now. For venue/legislation,
+    # we fall back to the legacy branch-filtered search.
     if branch and candidates:
-        candidates = [c for c in candidates if c.branch == branch]
+        # Only keep candidates that came from the branch-filtered search.
+        # Since the provider searches all branches, we need to check
+        # the concept's branch. But our provider doesn't populate branch
+        # (it returns ""), so this filter currently does nothing.
+        # TODO: For venue/legislation, use a branch-filtered provider.
+        pass
 
     if not candidates:
         return None
 
     best = candidates[0]  # pipeline returns sorted by score descending
-    return _candidate_to_folio_ref(best)
+    return _candidate_to_folio_ref(best, fallback_branch=branch or "")
+
+
+# ── Branch-filtered search for venue/legislation ───────────────────
+# The legacy code routes venue queries to /search/query?branch=forums_venues
+# and legislation to /search/query?branch=legal_authorities. These return
+# candidates without scores, so the legacy code uses pick_best_match.
+# For Option C, we use the legacy branch-filtered search and run the
+# results through folio-resolve's compute_relevance_score + gates.
+
+
+def _search_branch_filtered(
+    client: httpx.Client, query: str, branch: str
+) -> list[tuple[Concept, float]]:
+    """Branch-filtered /search/query; returns concepts with computed scores."""
+    if len(query.strip()) < 2:
+        return []
+    try:
+        resp = client.get(
+            f"{FOLIO_API_BASE}/search/query",
+            params={"label": query, "branch": branch, "limit": 20},
+        )
+        resp.raise_for_status()
+        classes = resp.json().get("classes", [])
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.warning("FOLIO search/query for branch %s failed: %s", branch, exc)
+        return []
+
+    from folio_resolve import compute_relevance_score, content_words
+
+    results: list[tuple[Concept, float]] = []
+    qc = content_words(query)
+    for cls in classes:
+        iri = cls.get("iri")
+        label = cls.get("label")
+        if not iri or not label:
+            continue
+        score = compute_relevance_score(qc, query, label)
+        if score > 0:
+            results.append((
+                Concept(iri=iri, label=label, branch=branch),
+                score,
+            ))
+    results.sort(key=lambda pair: (-pair[1], pair[0].iri))
+    return results
+
+
+def _resolve_branch_filtered(
+    client: httpx.Client, term: str, branch: str
+) -> FolioRef | None:
+    """Resolve using branch-filtered search + folio-resolve scoring."""
+    candidates = _search_branch_filtered(client, term, branch)
+    if not candidates:
+        return None
+
+    # Run through gates manually (the pipeline's search_by_label
+    # uses all-branches /search/label, not branch-filtered /search/query).
+    from folio_resolve import PlaceNameGate, ShortLabelGate
+
+    place_gate = PlaceNameGate(
+        extra_tokens=_SG_PLACE_TOKENS,
+        extra_markers=("republic of", "city of"),
+    )
+    short_gate = ShortLabelGate()
+
+    best: MatchCandidate | None = None
+    for concept, score in candidates:
+        place = place_gate.evaluate(
+            query=term, label=concept.label, branch=branch, score=score
+        )
+        short = short_gate.evaluate(query=term, label=concept.label, score=place.score)
+        final_score = short.score
+        if final_score < _SCORE_FLOOR:
+            continue
+        cand = MatchCandidate(
+            iri=concept.iri,
+            label=concept.label,
+            score=final_score,
+            branch=branch,
+            extraction_path="branch_filtered",
+            surface_term=term,
+            gated=place.demoted or short.demoted,
+            gate_reason="; ".join(r for r in (place.reason, short.reason) if r),
+        )
+        if best is None or cand.score > best.score:
+            best = cand
+
+    if best is None:
+        return None
+    return _candidate_to_folio_ref(best, fallback_branch=branch)
 
 
 # ── Public API (mirrors folio.py's interface) ──────────────────────
@@ -275,11 +386,12 @@ def resolve_venue(client: httpx.Client, court_name: str) -> FolioRef:
     """Resolve a court/forum name via folio-resolve.
 
     Local Singapore table checked first (same as legacy path).
+    Non-SG courts resolved via branch-filtered search + folio-resolve scoring.
     """
     local = lookup_sg_entity(court_name)
     if local:
         return local
-    ref = _resolve_via_pipeline(client, court_name, branch=FORUMS_VENUES_BRANCH)
+    ref = _resolve_branch_filtered(client, court_name, FORUMS_VENUES_BRANCH)
     if ref:
         return ref
     return _unresolved_ref(court_name)
@@ -289,11 +401,12 @@ def resolve_legislation(client: httpx.Client, name: str) -> FolioRef:
     """Resolve legislation via folio-resolve.
 
     Local Singapore table checked first (same as legacy path).
+    Non-SG legislation resolved via branch-filtered search + folio-resolve scoring.
     """
     local = lookup_sg_entity(name)
     if local:
         return local
-    ref = _resolve_via_pipeline(client, name, branch=LEGAL_AUTHORITIES_BRANCH)
+    ref = _resolve_branch_filtered(client, name, LEGAL_AUTHORITIES_BRANCH)
     if ref:
         return ref
     return _unresolved_ref(name)
@@ -330,14 +443,14 @@ def resolve_judgment_meta(
 
 
 def clear_cache() -> None:
-    """Clear the cached pipeline (mainly for tests)."""
-    global _pipeline, _ontology
+    """Clear the cached pipeline and provider (mainly for tests)."""
+    global _pipeline, _provider
     _pipeline = None
-    _ontology = None
+    _provider = None
 
 
 def set_pipeline(pipeline: MatchPipeline | None) -> None:
     """Inject a pre-built pipeline (for testing)."""
-    global _pipeline, _ontology
+    global _pipeline, _provider
     _pipeline = pipeline
-    _ontology = None if pipeline is None else getattr(pipeline, "_ontology", None)
+    _provider = None

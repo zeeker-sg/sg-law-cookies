@@ -1,470 +1,238 @@
 {
   "total": 10,
-  "differences": 6,
+  "differences": 3,
   "errors": 0,
-  "elapsed_s": 49.6,
+  "elapsed_s": 44.3,
   "diffs": [
     {
-      "index": 0,
-      "headline": "Court of Appeal clarifies interpretation of 'profits' in employment contracts wi",
-      "raw_areas": [
-        "Bankruptcy, Insolvency, and Restructuring Law",
-        "Employment Contracts Law",
-        "Contract Law"
-      ],
-      "raw_entities": [
-        "Court of Appeal of Singapore",
-        "Liquidation of Assets"
-      ],
-      "raw_concepts": [
-        "Clawback Provision Clause",
-        "Translation and Interpretation Services",
-        "Statement of Good Faith"
-      ],
-      "diff_fields": [
-        "entities",
-        "concepts",
-        "unresolved"
-      ],
-      "legacy_areas": [
-        {
-          "iri": "https://folio.openlegalstandard.org/R8g9E8c4U6pZQefIjUNRuDd",
-          "preferred_label": "Bankruptcy, Insolvency, and Restructuring Law",
-          "branch": "areas_of_law",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/RFG8cttIFCPLJVsOIlLOnY",
-          "preferred_label": "Employment Contracts Law",
-          "branch": "areas_of_law",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/RCIPwpgRpMs1eVz4vPid0pV",
-          "preferred_label": "Contract Law",
-          "branch": "areas_of_law",
-          "confidence": 1.0
-        }
-      ],
-      "adapter_areas": [
-        {
-          "iri": "https://folio.openlegalstandard.org/R8g9E8c4U6pZQefIjUNRuDd",
-          "preferred_label": "Bankruptcy, Insolvency, and Restructuring Law",
-          "branch": "areas_of_law",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/RFG8cttIFCPLJVsOIlLOnY",
-          "preferred_label": "Employment Contracts Law",
-          "branch": "areas_of_law",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/RCIPwpgRpMs1eVz4vPid0pV",
-          "preferred_label": "Contract Law",
-          "branch": "areas_of_law",
-          "confidence": 1.0
-        }
-      ],
-      "legacy_entities": [
-        {
-          "iri": null,
-          "preferred_label": "Court of Appeal of Singapore",
-          "branch": "sg_local",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/R8VZLSV59auMMRDIWkdOoV1",
-          "preferred_label": "Liquidation of Assets",
-          "branch": "objectives",
-          "confidence": 1.0
-        }
-      ],
-      "adapter_entities": [
-        {
-          "iri": null,
-          "preferred_label": "Court of Appeal of Singapore",
-          "branch": "sg_local",
-          "confidence": 1.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Liquidation of Assets",
-          "branch": "unresolved",
-          "confidence": 0.0
-        }
-      ],
-      "legacy_concepts": [
-        {
-          "iri": "https://folio.openlegalstandard.org/RDe37IpVB41x5rfauvnusv3",
-          "preferred_label": "Clawback Provision Clause",
-          "branch": "objectives",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/2fNWSOtQSvmFKYH_VbZvqw",
-          "preferred_label": "Translation and Interpretation Services",
-          "branch": "industry_and_market",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/RDsG6EEnGfPZ0wI0t2fG0IB",
-          "preferred_label": "Statement of Good Faith",
-          "branch": "document_/_artifact",
-          "confidence": 1.0
-        }
-      ],
-      "adapter_concepts": [],
-      "legacy_unresolved": [],
-      "adapter_unresolved": [
-        "Liquidation of Assets",
-        "Clawback Provision Clause",
-        "Translation and Interpretation Services",
-        "Statement of Good Faith"
-      ]
-    },
-    {
       "index": 1,
-      "headline": "High Court in Paulus Tannos @ Tjhin Thian Po v AG [2026] SGHC 118 clarifies that",
-      "raw_areas": [
-        "Public and Administrative Law"
-      ],
+      "headline": "SGFC reaffirms in [2026] SGFC 100 that lump sum child maintenance orders remain ",
+      "raw_areas": [],
       "raw_entities": [
-        "High Court of Singapore",
-        "Paul",
-        "General Rental Centers",
-        "Rules of Court 2021"
+        "Family Justice Courts",
+        "Plaintiff's Felonious Conduct",
+        "Defendant",
+        "Charter Bus Industry",
+        "Charter Bus Industry"
       ],
       "raw_concepts": [
-        "\"Interest Period\" Definition",
-        "U.S. Occupational Safety and Health Review Commission",
-        "Motion for Extension of Time Regarding Transcript"
+        "Home and Garden Equipment Repair and Maintenance",
+        "Meal Break",
+        "Child Support",
+        "Motion to Extend Plan Payments"
       ],
       "diff_fields": [
-        "entities",
-        "concepts",
-        "unresolved"
+        "entities"
       ],
-      "legacy_areas": [
-        {
-          "iri": "https://folio.openlegalstandard.org/R8YijwyycPV6XzUJaud9SB1",
-          "preferred_label": "Public and Administrative Law",
-          "branch": "areas_of_law",
-          "confidence": 1.0
-        }
-      ],
-      "adapter_areas": [
-        {
-          "iri": "https://folio.openlegalstandard.org/R8YijwyycPV6XzUJaud9SB1",
-          "preferred_label": "Public and Administrative Law",
-          "branch": "areas_of_law",
-          "confidence": 1.0
-        }
-      ],
+      "legacy_areas": [],
+      "adapter_areas": [],
       "legacy_entities": [
         {
           "iri": null,
-          "preferred_label": "High Court of Singapore",
+          "preferred_label": "Family Justice Courts",
           "branch": "sg_local",
           "confidence": 1.0
         },
         {
-          "iri": "https://folio.openlegalstandard.org/RC571eb4A5906518861F36be",
-          "preferred_label": "Paul",
-          "branch": "location",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/BrFDML66T4WGldUPS88j8w",
-          "preferred_label": "General Rental Centers",
-          "branch": "industry_and_market",
-          "confidence": 1.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Rules of Court 2021",
-          "branch": "unresolved",
-          "confidence": 0.0
-        }
-      ],
-      "adapter_entities": [
-        {
-          "iri": null,
-          "preferred_label": "High Court of Singapore",
-          "branch": "sg_local",
-          "confidence": 1.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Paul",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "General Rental Centers",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Rules of Court 2021",
-          "branch": "unresolved",
-          "confidence": 0.0
-        }
-      ],
-      "legacy_concepts": [
-        {
-          "iri": "https://folio.openlegalstandard.org/RBenwe55EuFEfw2h6cuZybk",
-          "preferred_label": "\"Interest Period\" Definition",
+          "iri": "https://folio.openlegalstandard.org/R86G86lb6rnblKVHUPK2eMc",
+          "preferred_label": "Plaintiff's Felonious Conduct",
           "branch": "objectives",
           "confidence": 1.0
         },
         {
-          "iri": "https://folio.openlegalstandard.org/R01E1a02E74a0235f7022f40",
-          "preferred_label": "U.S. Occupational Safety and Health Review Commission",
-          "branch": "governmental_body",
+          "iri": "https://folio.openlegalstandard.org/RijIqw1HEfQF4ctjWUlgnq",
+          "preferred_label": "Defendant",
+          "branch": "actor_/_player",
           "confidence": 1.0
         },
         {
-          "iri": "https://folio.openlegalstandard.org/RDoR0jtx5DG8yQrqK7ZW49E",
-          "preferred_label": "Motion for Extension of Time Regarding Transcript",
-          "branch": "document_/_artifact",
-          "confidence": 1.0
-        }
-      ],
-      "adapter_concepts": [],
-      "legacy_unresolved": [
-        "Rules of Court 2021"
-      ],
-      "adapter_unresolved": [
-        "Paul",
-        "General Rental Centers",
-        "Rules of Court 2021",
-        "\"Interest Period\" Definition",
-        "U.S. Occupational Safety and Health Review Commission",
-        "Motion for Extension of Time Regarding Transcript"
-      ]
-    },
-    {
-      "index": 2,
-      "headline": "Court of Appeal reaffirms retroactive application of judicial pronouncements in ",
-      "raw_areas": [
-        "Criminal Law",
-        "Public and Administrative Law"
-      ],
-      "raw_entities": [
-        "Court of Appeal of Singapore"
-      ],
-      "raw_concepts": [
-        "U.S. Sentencing Commission"
-      ],
-      "diff_fields": [
-        "concepts",
-        "unresolved"
-      ],
-      "legacy_areas": [
-        {
-          "iri": "https://folio.openlegalstandard.org/RMZ6lNihK8TG4Flhco1yTy",
-          "preferred_label": "Criminal Law",
-          "branch": "areas_of_law",
+          "iri": "https://folio.openlegalstandard.org/BaVNrMR7RXuuE7B7JAPu2g",
+          "preferred_label": "Charter Bus Industry",
+          "branch": "industry_and_market",
           "confidence": 1.0
         },
         {
-          "iri": "https://folio.openlegalstandard.org/R8YijwyycPV6XzUJaud9SB1",
-          "preferred_label": "Public and Administrative Law",
-          "branch": "areas_of_law",
-          "confidence": 1.0
-        }
-      ],
-      "adapter_areas": [
-        {
-          "iri": "https://folio.openlegalstandard.org/RMZ6lNihK8TG4Flhco1yTy",
-          "preferred_label": "Criminal Law",
-          "branch": "areas_of_law",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/R8YijwyycPV6XzUJaud9SB1",
-          "preferred_label": "Public and Administrative Law",
-          "branch": "areas_of_law",
-          "confidence": 1.0
-        }
-      ],
-      "legacy_entities": [
-        {
-          "iri": null,
-          "preferred_label": "Court of Appeal of Singapore",
-          "branch": "sg_local",
+          "iri": "https://folio.openlegalstandard.org/BaVNrMR7RXuuE7B7JAPu2g",
+          "preferred_label": "Charter Bus Industry",
+          "branch": "industry_and_market",
           "confidence": 1.0
         }
       ],
       "adapter_entities": [
         {
           "iri": null,
-          "preferred_label": "Court of Appeal of Singapore",
+          "preferred_label": "Family Justice Courts",
           "branch": "sg_local",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R86G86lb6rnblKVHUPK2eMc",
+          "preferred_label": "Plaintiff's Felonious Conduct",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RijIqw1HEfQF4ctjWUlgnq",
+          "preferred_label": "Defendant",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/7MgoS11HTvC5UBEHdX0Q4A",
+          "preferred_label": "Charter Bus Industry",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/7MgoS11HTvC5UBEHdX0Q4A",
+          "preferred_label": "Charter Bus Industry",
+          "branch": "",
           "confidence": 1.0
         }
       ],
       "legacy_concepts": [
         {
-          "iri": "https://folio.openlegalstandard.org/RCA3900FC29eeAC1ff6AFa85",
-          "preferred_label": "U.S. Sentencing Commission",
-          "branch": "governmental_body",
+          "iri": "https://folio.openlegalstandard.org/Gh1SKS0iT6CQVsb7yzbjow",
+          "preferred_label": "Home and Garden Equipment Repair and Maintenance",
+          "branch": "industry_and_market",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R7aPdNazR2TDAE03Nhekjx",
+          "preferred_label": "Meal Break",
+          "branch": "event",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R9JcsdtYN2CUc5CfCTULHYC",
+          "preferred_label": "Child Support",
+          "branch": "objectives",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R8olDeBpZZbYdWS121VXEMQ",
+          "preferred_label": "Motion to Extend Plan Payments",
+          "branch": "document_/_artifact",
           "confidence": 1.0
         }
       ],
-      "adapter_concepts": [],
+      "adapter_concepts": [
+        {
+          "iri": "https://folio.openlegalstandard.org/Gh1SKS0iT6CQVsb7yzbjow",
+          "preferred_label": "Home and Garden Equipment Repair and Maintenance",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R7aPdNazR2TDAE03Nhekjx",
+          "preferred_label": "Meal Break",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R9JcsdtYN2CUc5CfCTULHYC",
+          "preferred_label": "Child Support",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R8olDeBpZZbYdWS121VXEMQ",
+          "preferred_label": "Motion to Extend Plan Payments",
+          "branch": "",
+          "confidence": 1.0
+        }
+      ],
       "legacy_unresolved": [],
-      "adapter_unresolved": [
-        "U.S. Sentencing Commission"
-      ]
+      "adapter_unresolved": []
     },
     {
-      "index": 3,
-      "headline": "District Court in [2026] SGDC 242 applies graduated mitigation approach to rejec",
+      "index": 4,
+      "headline": "Law Society to publish audit report on governance and workplace culture followin",
       "raw_areas": [
-        "Personal Injury and Tort Law",
-        "Negligence and Malpractice Law"
+        "Corporate Governance Law",
+        "Defamation Law",
+        "Privacy Law"
       ],
       "raw_entities": [
-        "State Courts",
-        "Kua Li Chuen",
-        "Insider Trading",
-        "Hospital Malpractice",
-        "Fauzi Bin Noh v Zulkepli Bin Husain [2025] SGHC 172",
-        "Ng Kah Ming v Tan Sok Hui Jessica [2024] SGDC 158",
-        "Sing Buri"
+        "Law Enforcement Arrest Tracking Number",
+        "Law Minister"
       ],
       "raw_concepts": [
         "Ig",
-        "Family Treatment",
-        "Hazardous Waste Treatment and Disposal",
-        "General Medical and Surgical Hospitals",
-        "Analysis of Pre-Petition Lien Issues",
-        "Causation",
-        "Medical - Real Estate Asset"
+        "Lease Obligations",
+        "L656 Redaction",
+        "Internal Medicine Negligence"
       ],
       "diff_fields": [
         "entities",
-        "concepts",
         "unresolved"
       ],
       "legacy_areas": [
         {
-          "iri": "https://folio.openlegalstandard.org/R7MK1XmyjtYxZKg8Iw4ZN4K",
-          "preferred_label": "Personal Injury and Tort Law",
+          "iri": "https://folio.openlegalstandard.org/RB7pLfw7zqXtd20kKg7EcOA",
+          "preferred_label": "Corporate Governance Law",
           "branch": "areas_of_law",
           "confidence": 1.0
         },
         {
-          "iri": "https://folio.openlegalstandard.org/RR7oJoEqb12ZxVMvTIb7I0",
-          "preferred_label": "Negligence and Malpractice Law",
+          "iri": "https://folio.openlegalstandard.org/RCL9tL1XOTncmAJsSYApAw",
+          "preferred_label": "Defamation Law",
+          "branch": "areas_of_law",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R8hJCf4Ih6iuFXsxeK7e6zU",
+          "preferred_label": "Privacy Law",
           "branch": "areas_of_law",
           "confidence": 1.0
         }
       ],
       "adapter_areas": [
         {
-          "iri": "https://folio.openlegalstandard.org/R7MK1XmyjtYxZKg8Iw4ZN4K",
-          "preferred_label": "Personal Injury and Tort Law",
+          "iri": "https://folio.openlegalstandard.org/RB7pLfw7zqXtd20kKg7EcOA",
+          "preferred_label": "Corporate Governance Law",
           "branch": "areas_of_law",
           "confidence": 1.0
         },
         {
-          "iri": "https://folio.openlegalstandard.org/RR7oJoEqb12ZxVMvTIb7I0",
-          "preferred_label": "Negligence and Malpractice Law",
+          "iri": "https://folio.openlegalstandard.org/RCL9tL1XOTncmAJsSYApAw",
+          "preferred_label": "Defamation Law",
+          "branch": "areas_of_law",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R8hJCf4Ih6iuFXsxeK7e6zU",
+          "preferred_label": "Privacy Law",
           "branch": "areas_of_law",
           "confidence": 1.0
         }
       ],
       "legacy_entities": [
         {
-          "iri": null,
-          "preferred_label": "State Courts",
-          "branch": "sg_local",
+          "iri": "https://folio.openlegalstandard.org/R5PLLDprnqJRdq60whLLp6",
+          "preferred_label": "Law Enforcement Arrest Tracking Number",
+          "branch": "engagement_attributes",
           "confidence": 1.0
         },
         {
           "iri": null,
-          "preferred_label": "Kua Li Chuen",
+          "preferred_label": "Law Minister",
           "branch": "unresolved",
           "confidence": 0.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/R9vzE33TyrWCJovQdYnU5Mv",
-          "preferred_label": "Insider Trading",
-          "branch": "objectives",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/R2kyLV6KMt1ucq2U82iAcD",
-          "preferred_label": "Hospital Malpractice",
-          "branch": "objectives",
-          "confidence": 1.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Fauzi Bin Noh v Zulkepli Bin Husain [2025] SGHC 172",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Ng Kah Ming v Tan Sok Hui Jessica [2024] SGDC 158",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/RB103b276947324480bB786b",
-          "preferred_label": "Sing Buri",
-          "branch": "location",
-          "confidence": 1.0
         }
       ],
       "adapter_entities": [
         {
-          "iri": null,
-          "preferred_label": "State Courts",
-          "branch": "sg_local",
+          "iri": "https://folio.openlegalstandard.org/R5PLLDprnqJRdq60whLLp6",
+          "preferred_label": "Law Enforcement Arrest Tracking Number",
+          "branch": "",
           "confidence": 1.0
         },
         {
-          "iri": null,
-          "preferred_label": "Kua Li Chuen",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Insider Trading",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Hospital Malpractice",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Fauzi Bin Noh v Zulkepli Bin Husain [2025] SGHC 172",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Ng Kah Ming v Tan Sok Hui Jessica [2024] SGDC 158",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Sing Buri",
-          "branch": "unresolved",
-          "confidence": 0.0
+          "iri": "https://folio.openlegalstandard.org/R2F1f694B8f127B683aD9c9b",
+          "preferred_label": "National Institute of Standards and Technology",
+          "branch": "",
+          "confidence": 0.9
         }
       ],
       "legacy_concepts": [
@@ -475,77 +243,76 @@
           "confidence": 1.0
         },
         {
-          "iri": "https://folio.openlegalstandard.org/Rea9CN6cmzC9K2n9OeOTvS",
-          "preferred_label": "Family Treatment",
+          "iri": "https://folio.openlegalstandard.org/RDMUsjTZ7MYlmJzfXob9Rfi",
+          "preferred_label": "Lease Obligations",
+          "branch": "financial_concepts_and_metrics",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RzRevQI04QCGyTSdEECdeQQ",
+          "preferred_label": "L656 Redaction",
+          "branch": "standards_compatibility",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R8KOOEzWFRtQJgpQNRToCPU",
+          "preferred_label": "Internal Medicine Negligence",
           "branch": "objectives",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/o1eolto-RoGPANH2H3gWqg",
-          "preferred_label": "Hazardous Waste Treatment and Disposal",
-          "branch": "industry_and_market",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/f1BPS-gjRYOSkEykotZZIQ",
-          "preferred_label": "General Medical and Surgical Hospitals",
-          "branch": "industry_and_market",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/R84K4Nv1zRRqSIU4YEOUSdH",
-          "preferred_label": "Analysis of Pre-Petition Lien Issues",
-          "branch": "service",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/RkZEAQckzKSYkegDiztFb6",
-          "preferred_label": "Causation",
-          "branch": "objectives",
-          "confidence": 1.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/RBv4XsEwEtXuQ1OHVJcC1Iu",
-          "preferred_label": "Medical - Real Estate Asset",
-          "branch": "asset_type",
           "confidence": 1.0
         }
       ],
-      "adapter_concepts": [],
-      "legacy_unresolved": [
-        "Kua Li Chuen",
-        "Fauzi Bin Noh v Zulkepli Bin Husain [2025] SGHC 172",
-        "Ng Kah Ming v Tan Sok Hui Jessica [2024] SGDC 158"
+      "adapter_concepts": [
+        {
+          "iri": "https://folio.openlegalstandard.org/R25B7be5E4c8a07E5ba2153f",
+          "preferred_label": "Ig",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RDMUsjTZ7MYlmJzfXob9Rfi",
+          "preferred_label": "Lease Obligations",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RzRevQI04QCGyTSdEECdeQQ",
+          "preferred_label": "L656 Redaction",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R8KOOEzWFRtQJgpQNRToCPU",
+          "preferred_label": "Internal Medicine Negligence",
+          "branch": "",
+          "confidence": 1.0
+        }
       ],
-      "adapter_unresolved": [
-        "Kua Li Chuen",
-        "Insider Trading",
-        "Hospital Malpractice",
-        "Fauzi Bin Noh v Zulkepli Bin Husain [2025] SGHC 172",
-        "Ng Kah Ming v Tan Sok Hui Jessica [2024] SGDC 158",
-        "Sing Buri",
-        "Ig",
-        "Family Treatment",
-        "Hazardous Waste Treatment and Disposal",
-        "General Medical and Surgical Hospitals",
-        "Analysis of Pre-Petition Lien Issues",
-        "Causation",
-        "Medical - Real Estate Asset"
-      ]
+      "legacy_unresolved": [
+        "Law Minister"
+      ],
+      "adapter_unresolved": []
     },
     {
-      "index": 4,
-      "headline": "Government extends ABSD remission deadlines for large-scale collective sale deve",
+      "index": 5,
+      "headline": "High Court holds in [2026] SGHC 138 that bona fide and substantial debt disputes",
       "raw_areas": [
-        "Real Property Law",
-        "Tax Law"
+        "Corporate Insolvency Law",
+        "Contract Law"
       ],
       "raw_entities": [
-        "U.S. Railroad Retirement Board"
+        "High Court of Singapore",
+        "Mae Hong Son",
+        "Holding Company",
+        "Exam Preparation and Tutoring",
+        "s 124(1)(c) IRDA",
+        "s 125(1)(e) IRDA",
+        "Water Resources and Wetlands Law"
       ],
       "raw_concepts": [
-        "Sal",
-        "Coverage for Causes Extending From Insured Risk"
+        "DEPRECATED Creditor Claims Practice",
+        "Dispute Service",
+        "Debt Agreement",
+        "Abuse of Process"
       ],
       "diff_fields": [
         "entities",
@@ -554,216 +321,152 @@
       ],
       "legacy_areas": [
         {
-          "iri": "https://folio.openlegalstandard.org/RDb8aZxNJsmCvQGbfiFyfI7",
-          "preferred_label": "Real Property Law",
+          "iri": "https://folio.openlegalstandard.org/RBGaYz0rr5Dh0Sjxu0Z6DHx",
+          "preferred_label": "Corporate Insolvency Law",
           "branch": "areas_of_law",
           "confidence": 1.0
         },
         {
-          "iri": "https://folio.openlegalstandard.org/RDGdgxwCGXpkY1zfT2WwGl9",
-          "preferred_label": "Tax Law",
+          "iri": "https://folio.openlegalstandard.org/RCIPwpgRpMs1eVz4vPid0pV",
+          "preferred_label": "Contract Law",
           "branch": "areas_of_law",
           "confidence": 1.0
         }
       ],
       "adapter_areas": [
         {
-          "iri": "https://folio.openlegalstandard.org/RDb8aZxNJsmCvQGbfiFyfI7",
-          "preferred_label": "Real Property Law",
+          "iri": "https://folio.openlegalstandard.org/RBGaYz0rr5Dh0Sjxu0Z6DHx",
+          "preferred_label": "Corporate Insolvency Law",
           "branch": "areas_of_law",
           "confidence": 1.0
         },
         {
-          "iri": "https://folio.openlegalstandard.org/RDGdgxwCGXpkY1zfT2WwGl9",
-          "preferred_label": "Tax Law",
+          "iri": "https://folio.openlegalstandard.org/RCIPwpgRpMs1eVz4vPid0pV",
+          "preferred_label": "Contract Law",
           "branch": "areas_of_law",
           "confidence": 1.0
         }
       ],
       "legacy_entities": [
         {
-          "iri": "https://folio.openlegalstandard.org/R17Def1B6A301A4F60311a8b",
-          "preferred_label": "U.S. Railroad Retirement Board",
-          "branch": "governmental_body",
+          "iri": null,
+          "preferred_label": "High Court of Singapore",
+          "branch": "sg_local",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R30E851C449da0A3c86D2742",
+          "preferred_label": "Mae Hong Son",
+          "branch": "location",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R9WYIrIeT3fTYMxfW0xZldF",
+          "preferred_label": "Holding Company",
+          "branch": "legal_entity",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/AtpClf7tR5SbFk363YGzRg",
+          "preferred_label": "Exam Preparation and Tutoring",
+          "branch": "industry_and_market",
+          "confidence": 1.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "s 124(1)(c) IRDA",
+          "branch": "unresolved",
+          "confidence": 0.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "s 125(1)(e) IRDA",
+          "branch": "unresolved",
+          "confidence": 0.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R7KYATnZcNxJsZ1MQBADZ0x",
+          "preferred_label": "Water Resources and Wetlands Law",
+          "branch": "areas_of_law",
           "confidence": 1.0
         }
       ],
       "adapter_entities": [
         {
           "iri": null,
-          "preferred_label": "U.S. Railroad Retirement Board",
+          "preferred_label": "High Court of Singapore",
+          "branch": "sg_local",
+          "confidence": 1.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "Mae Hong Son",
+          "branch": "unresolved",
+          "confidence": 0.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "Holding Company",
+          "branch": "unresolved",
+          "confidence": 0.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "Exam Preparation and Tutoring",
+          "branch": "unresolved",
+          "confidence": 0.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "s 124(1)(c) IRDA",
+          "branch": "unresolved",
+          "confidence": 0.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "s 125(1)(e) IRDA",
+          "branch": "unresolved",
+          "confidence": 0.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "Water Resources and Wetlands Law",
           "branch": "unresolved",
           "confidence": 0.0
         }
       ],
       "legacy_concepts": [
         {
-          "iri": "https://folio.openlegalstandard.org/RC01c83EFC92e6A08ebAEe14",
-          "preferred_label": "Sal",
-          "branch": "location",
+          "iri": "https://folio.openlegalstandard.org/R88zIAkD2h7CyGFRkVd2A1F",
+          "preferred_label": "DEPRECATED Creditor Claims Practice",
+          "branch": "zzz_-_sandbox:_under_construction",
           "confidence": 1.0
         },
         {
-          "iri": "https://folio.openlegalstandard.org/R37FvPsRLcbw663pimU2TZ",
-          "preferred_label": "Coverage for Causes Extending From Insured Risk",
-          "branch": "objectives",
+          "iri": "https://folio.openlegalstandard.org/RDigDgTiLFmt7iX3436yCOT",
+          "preferred_label": "Dispute Service",
+          "branch": "service",
           "confidence": 1.0
         }
       ],
-      "adapter_concepts": [],
-      "legacy_unresolved": [],
-      "adapter_unresolved": [
-        "U.S. Railroad Retirement Board",
-        "Sal",
-        "Coverage for Causes Extending From Insured Risk"
-      ]
-    },
-    {
-      "index": 8,
-      "headline": "Maintenance Enforcement Process (MEP) expanded to all eligible maintenance order",
-      "raw_areas": [],
-      "raw_entities": [
-        "Ministry of Law",
-        "Development of Property Practice",
-        "Family Justice Courts",
-        "Regulatory Enforcement",
-        "Art",
-        "Ship",
-        "Islamic Law System",
-        "Other Personal and Household Goods Repair and Maintenance"
-      ],
-      "raw_concepts": [
-        "Regulatory Enforcement",
-        "Small Claims / Conciliation Court"
-      ],
-      "diff_fields": [
-        "entities",
-        "unresolved"
-      ],
-      "legacy_areas": [],
-      "adapter_areas": [],
-      "legacy_entities": [
-        {
-          "iri": null,
-          "preferred_label": "Ministry of Law",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Development of Property Practice",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Family Justice Courts",
-          "branch": "sg_local",
-          "confidence": 1.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Regulatory Enforcement",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Art",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Ship",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Islamic Law System",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Other Personal and Household Goods Repair and Maintenance",
-          "branch": "unresolved",
-          "confidence": 0.0
-        }
-      ],
-      "adapter_entities": [
-        {
-          "iri": null,
-          "preferred_label": "Ministry of Law",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Development of Property Practice",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Family Justice Courts",
-          "branch": "sg_local",
-          "confidence": 1.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Regulatory Enforcement",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Art",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Ship",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": null,
-          "preferred_label": "Islamic Law System",
-          "branch": "unresolved",
-          "confidence": 0.0
-        },
-        {
-          "iri": "https://folio.openlegalstandard.org/R8D2A8vpEW3oEpxLRVkaVDk",
-          "preferred_label": "Personal Insolvency Law",
-          "branch": "areas_of_law",
-          "confidence": 0.704
-        }
-      ],
-      "legacy_concepts": [],
       "adapter_concepts": [],
       "legacy_unresolved": [
-        "Ministry of Law",
-        "Development of Property Practice",
-        "Regulatory Enforcement",
-        "Art",
-        "Ship",
-        "Islamic Law System",
-        "Other Personal and Household Goods Repair and Maintenance",
-        "Regulatory Enforcement",
-        "Small Claims / Conciliation Court"
+        "s 124(1)(c) IRDA",
+        "s 125(1)(e) IRDA",
+        "Debt Agreement",
+        "Abuse of Process"
       ],
       "adapter_unresolved": [
-        "Ministry of Law",
-        "Development of Property Practice",
-        "Regulatory Enforcement",
-        "Art",
-        "Ship",
-        "Islamic Law System",
-        "Regulatory Enforcement",
-        "Small Claims / Conciliation Court"
+        "Mae Hong Son",
+        "Holding Company",
+        "Exam Preparation and Tutoring",
+        "s 124(1)(c) IRDA",
+        "s 125(1)(e) IRDA",
+        "Water Resources and Wetlands Law",
+        "DEPRECATED Creditor Claims Practice",
+        "Dispute Service",
+        "Debt Agreement",
+        "Abuse of Process"
       ]
     }
   ],

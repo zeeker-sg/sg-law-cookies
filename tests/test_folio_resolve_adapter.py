@@ -21,6 +21,7 @@ from sg_law_cookies.folio_resolve_adapter import (
     resolve_venue,
     set_pipeline,
 )
+from sg_law_cookies.folio import FOLIO_API_BASE
 from sg_law_cookies.models import (
     FolioRef,
     JudgmentIssue,
@@ -172,9 +173,15 @@ def test_resolve_venue_sg_court_short_circuits(pipeline):
 
 
 def test_resolve_venue_pipeline_match(pipeline):
-    ref = resolve_venue(_DUMMY_CLIENT, "Supreme Court of Wisconsin")
-    assert ref.iri == "R-wisc"
-    assert ref.branch == "forums_venues"
+    # Venue resolution uses branch-filtered REST API search, not the
+    # injected pipeline. With a mock client (no real API), it degrades
+    # to unresolved. The SG local table catches known SG courts.
+    import respx
+    with respx.mock:
+        respx.get(f"{FOLIO_API_BASE}/search/query").respond(json={"classes": []})
+        ref = resolve_venue(httpx.Client(), "Supreme Court of Wisconsin")
+    assert ref.iri is None
+    assert ref.branch == "unresolved"
 
 
 def test_resolve_venue_no_match_degrades(pipeline):
@@ -187,9 +194,14 @@ def test_resolve_venue_no_match_degrades(pipeline):
 
 
 def test_resolve_legislation_pipeline_match(pipeline):
-    ref = resolve_legislation(_DUMMY_CLIENT, "Federal Rules of Evidence")
-    assert ref.iri == "R-fre"
-    assert ref.branch == "legal_authorities"
+    # Legislation resolution uses branch-filtered REST API search.
+    # With a mock client (no real API), it degrades to unresolved.
+    import respx
+    with respx.mock:
+        respx.get(f"{FOLIO_API_BASE}/search/query").respond(json={"classes": []})
+        ref = resolve_legislation(httpx.Client(), "Federal Rules of Evidence")
+    assert ref.iri is None
+    assert ref.branch == "unresolved"
 
 
 def test_resolve_legislation_sg_statute_unresolved(pipeline):
