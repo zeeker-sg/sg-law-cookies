@@ -36,18 +36,24 @@ from folio_resolve import (
 )
 
 from sg_law_cookies.area_vocab import AREA_IRI_BY_LABEL
-from sg_law_cookies.folio import (
-    AREAS_OF_LAW_BRANCH,
-    FOLIO_API_BASE,
-    FORUMS_VENUES_BRANCH,
-    LEGAL_AUTHORITIES_BRANCH,
-    CONFIDENCE_THRESHOLD,
-    _unresolved_ref,
-)
 from sg_law_cookies.models import FolioRef, JudgmentMeta, TopicExtraction
 from sg_law_cookies.sg_mappings import lookup_sg_entity
 
 logger = logging.getLogger(__name__)
+
+# ── Shared constants (formerly in folio.py, now here to avoid circular imports) ──
+
+FOLIO_API_BASE = "https://folio.openlegalstandard.org"
+CONFIDENCE_THRESHOLD = 0.6
+AREAS_OF_LAW_BRANCH = "areas_of_law"
+FORUMS_VENUES_BRANCH = "forums_venues"
+LEGAL_AUTHORITIES_BRANCH = "legal_authorities"
+_UNRESOLVED_BRANCH = "unresolved"
+
+
+def _unresolved_ref(label: str) -> FolioRef:
+    """Create an unresolved FolioRef placeholder."""
+    return FolioRef(iri=None, preferred_label=label, branch=_UNRESOLVED_BRANCH, confidence=0.0)
 
 # folio-resolve scores are 0-100; our confidence is 0.0-1.0.
 _SCORE_SCALE = 100.0
@@ -85,6 +91,7 @@ class RestApiOntologyProvider:
         self._client = client
         self._search_cache: dict[str, list[tuple[Concept, float]]] = {}
         self._concept_cache: dict[str, Concept] = {}
+        self._branch_cache: dict[str, str] = {}
 
     def search_by_label(
         self, query: str, *, limit: int = 20
@@ -154,14 +161,29 @@ class RestApiOntologyProvider:
         return self._concept_cache.get(iri)
 
     def _branch_for_iri(self, iri: str) -> str:
-        """Derive the taxonomy branch of a concept from its path to root."""
-        # For the spike, we use a simplified branch derivation.
-        # The legacy code calls /taxonomy/tree/path/<id> which adds
-        # an extra API call per concept. We skip it here — the pipeline's
-        # branch filtering for venues/legislation uses a different mechanism
-        # (the adapter filters candidates by branch before returning).
-        # For concepts/entities, branch is informational, not functional.
-        return ""
+        """Derive the taxonomy branch of a concept from its path to root.
+
+        Calls GET /taxonomy/tree/path/<id> (cached per IRI). The root
+        label of the path determines the branch, same as legacy
+        ``folio._branch_for_iri``. Returns "" on API failure.
+        """
+        if iri in self._branch_cache:
+            return self._branch_cache[iri]
+        branch = ""
+        try:
+            iri_id = iri.rsplit("/", 1)[-1]
+            resp = self._client.get(
+                f"{FOLIO_API_BASE}/taxonomy/tree/path/{iri_id}"
+            )
+            resp.raise_for_status()
+            path = resp.json().get("path", [])
+            if path and path[0].get("label"):
+                root = path[0]["label"]
+                branch = AREAS_OF_LAW_BRANCH if root == "Area of Law" else "_".join(root.lower().split())
+        except (httpx.HTTPError, ValueError) as exc:
+            logger.debug("taxonomy path failed for %s: %s", iri, exc)
+        self._branch_cache[iri] = branch
+        return branch
 
 
 # ── Pipeline construction ─────────────────────────────────────────

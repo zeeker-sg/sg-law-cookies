@@ -1,4 +1,13 @@
-"""Tests for FOLIO resolution (folio.py) and Singapore mappings."""
+"""Tests for FOLIO resolution (folio.py) and Singapore mappings.
+
+The legacy hand-rolled matcher (``pick_best_match``, ``SearchResult``,
+``_search_all_branches`` …) has been replaced by the folio-resolve
+adapter (``folio_resolve_adapter.py``).  ``folio.py`` is now a thin
+facade that delegates to the adapter, so these tests exercise the
+adapter through the facade and mock the same FOLIO REST API endpoints
+the adapter calls (``/search/label``, ``/search/query``,
+``/taxonomy/tree/path``).
+"""
 
 import httpx
 import pytest
@@ -8,8 +17,6 @@ from sg_law_cookies import folio
 from sg_law_cookies.area_vocab import AREA_IRI_BY_LABEL
 from sg_law_cookies.folio import (
     FOLIO_API_BASE,
-    SearchResult,
-    pick_best_match,
     resolve_topic,
 )
 from sg_law_cookies.models import TopicExtraction
@@ -43,50 +50,6 @@ def _owl_class(label: str, iri_id: str, children: list[str] | None = None) -> di
 
 def _path_payload(root_label: str) -> dict:
     return {"path": [{"iri": f"{FOLIO_API_BASE}/Rroot", "label": root_label, "id": "Rroot"}]}
-
-
-# ── pick_best_match ──────────────────────────────────────────────
-
-
-def test_pick_best_match_exact_case_insensitive():
-    results = [SearchResult(iri="i1", label="Employment Law", relevance=0.5)]
-    best = pick_best_match(results, "employment law")
-    assert best is not None
-    assert best.score == 1.0
-    assert best.iri == "i1"
-
-
-def test_pick_best_match_substring_either_direction():
-    results = [SearchResult(iri="i1", label="Constructive Dismissal", relevance=0.0)]
-    assert pick_best_match(results, "dismissal").score == 0.8
-    assert pick_best_match(results, "constructive dismissal claims and remedies").score == 0.8
-
-
-def test_pick_best_match_uses_normalised_relevance():
-    results = [SearchResult(iri="i1", label="Employment Arbitration Rules", relevance=0.9)]
-    best = pick_best_match(results, "employment dispute")
-    assert best.score == 0.9
-
-
-def test_pick_best_match_below_threshold_returns_none():
-    results = [SearchResult(iri="i1", label="Saint Barthélemy", relevance=0.0)]
-    assert pick_best_match(results, "estoppel") is None
-    assert pick_best_match([], "estoppel") is None
-
-
-def test_pick_best_match_threshold_overridable():
-    results = [SearchResult(iri="i1", label="Corporate Governance", relevance=0.5)]
-    assert pick_best_match(results, "widget", threshold=0.6) is None
-    best = pick_best_match(results, "widget", threshold=0.4)  # falls back to relevance
-    assert best is not None
-    assert best.score == 0.5
-
-
-def test_pick_best_match_prefers_leaf_on_tie():
-    parent = SearchResult(iri="parent", label="Law of Torts", relevance=0.0, is_leaf=False)
-    leaf = SearchResult(iri="leaf", label="Torts and Negligence", relevance=0.0, is_leaf=True)
-    best = pick_best_match([parent, leaf], "torts")  # both substring -> 0.8
-    assert best.iri == "leaf"
 
 
 # ── resolve_topic, offline (respx) ───────────────────────────────
@@ -129,6 +92,9 @@ def test_resolve_area_dedupes_repeated_labels():
 
 @respx.mock
 def test_resolve_concept_substring_match():
+    # folio-resolve passes the API score through the gates unchanged when the
+    # candidate is not a place-name / short-label, so an API score of 90.0
+    # becomes confidence 0.9 (90/100) — not the legacy 0.8 substring score.
     respx.get(f"{FOLIO_API_BASE}/search/label").respond(
         json={"results": [[_owl_class("Constructive Dismissal", "Rcd1"), 90.0]]}
     )
@@ -141,21 +107,22 @@ def test_resolve_concept_substring_match():
     assert len(topic.folio_concepts) == 1
     ref = topic.folio_concepts[0]
     assert ref.preferred_label == "Constructive Dismissal"
-    assert ref.confidence == 0.8
+    assert ref.confidence == pytest.approx(0.9)
     assert ref.branch == "objectives"
     assert topic.unresolved == []
 
 
 @respx.mock
 def test_resolve_concept_below_threshold_goes_unresolved():
-    # API junk floor: unrelated labels still score ~90/100.
+    # folio-resolve's gates demote place-name / short-label false positives
+    # below the confidence floor (60/100), so they land in unresolved.
+    # "Court of Samoa" contains a place-name token ("Samoa") which the
+    # PlaceNameGate recognises and demotes to 40/100 — below the floor.
     respx.get(f"{FOLIO_API_BASE}/search/label").respond(
-        json={
-            "results": [
-                [_owl_class("Saint Barthélemy", "Rj1"), 90.0],
-                [_owl_class("Wisconsin State Courts", "Rj2"), 90.0],
-            ]
-        }
+        json={"results": [[_owl_class("Court of Samoa", "Rj1"), 90.0]]}
+    )
+    respx.get(url__regex=rf"{FOLIO_API_BASE}/taxonomy/tree/path/.*").respond(
+        json=_path_payload("Forums")
     )
     topic = _topic(raw_concepts=["promissory estoppel"])
     with httpx.Client() as client:
@@ -237,7 +204,7 @@ def test_resolve_area_iri_points_at_folio():
 
 @respx.mock
 def test_folio_500_lands_in_unresolved_not_raise():
-    folio._search_cache.clear()
+    folio.clear_cache()
     respx.get(f"{FOLIO_API_BASE}/search/query").respond(500)
     respx.get(f"{FOLIO_API_BASE}/search/label").respond(500)
     topic = TopicExtraction(
@@ -252,7 +219,7 @@ def test_folio_500_lands_in_unresolved_not_raise():
 
 @respx.mock
 def test_single_char_query_skips_api():
-    folio._search_cache.clear()
+    folio.clear_cache()
     route = respx.get(f"{FOLIO_API_BASE}/search/label").respond(200, json={"results": []})
     topic = TopicExtraction(
         headline="h", summary="s", why_it_matters="w", significance="low",
