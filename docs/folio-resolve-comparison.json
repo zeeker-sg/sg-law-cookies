@@ -1,0 +1,474 @@
+{
+  "total": 10,
+  "differences": 3,
+  "errors": 0,
+  "elapsed_s": 44.3,
+  "diffs": [
+    {
+      "index": 1,
+      "headline": "SGFC reaffirms in [2026] SGFC 100 that lump sum child maintenance orders remain ",
+      "raw_areas": [],
+      "raw_entities": [
+        "Family Justice Courts",
+        "Plaintiff's Felonious Conduct",
+        "Defendant",
+        "Charter Bus Industry",
+        "Charter Bus Industry"
+      ],
+      "raw_concepts": [
+        "Home and Garden Equipment Repair and Maintenance",
+        "Meal Break",
+        "Child Support",
+        "Motion to Extend Plan Payments"
+      ],
+      "diff_fields": [
+        "entities"
+      ],
+      "legacy_areas": [],
+      "adapter_areas": [],
+      "legacy_entities": [
+        {
+          "iri": null,
+          "preferred_label": "Family Justice Courts",
+          "branch": "sg_local",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R86G86lb6rnblKVHUPK2eMc",
+          "preferred_label": "Plaintiff's Felonious Conduct",
+          "branch": "objectives",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RijIqw1HEfQF4ctjWUlgnq",
+          "preferred_label": "Defendant",
+          "branch": "actor_/_player",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/BaVNrMR7RXuuE7B7JAPu2g",
+          "preferred_label": "Charter Bus Industry",
+          "branch": "industry_and_market",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/BaVNrMR7RXuuE7B7JAPu2g",
+          "preferred_label": "Charter Bus Industry",
+          "branch": "industry_and_market",
+          "confidence": 1.0
+        }
+      ],
+      "adapter_entities": [
+        {
+          "iri": null,
+          "preferred_label": "Family Justice Courts",
+          "branch": "sg_local",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R86G86lb6rnblKVHUPK2eMc",
+          "preferred_label": "Plaintiff's Felonious Conduct",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RijIqw1HEfQF4ctjWUlgnq",
+          "preferred_label": "Defendant",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/7MgoS11HTvC5UBEHdX0Q4A",
+          "preferred_label": "Charter Bus Industry",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/7MgoS11HTvC5UBEHdX0Q4A",
+          "preferred_label": "Charter Bus Industry",
+          "branch": "",
+          "confidence": 1.0
+        }
+      ],
+      "legacy_concepts": [
+        {
+          "iri": "https://folio.openlegalstandard.org/Gh1SKS0iT6CQVsb7yzbjow",
+          "preferred_label": "Home and Garden Equipment Repair and Maintenance",
+          "branch": "industry_and_market",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R7aPdNazR2TDAE03Nhekjx",
+          "preferred_label": "Meal Break",
+          "branch": "event",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R9JcsdtYN2CUc5CfCTULHYC",
+          "preferred_label": "Child Support",
+          "branch": "objectives",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R8olDeBpZZbYdWS121VXEMQ",
+          "preferred_label": "Motion to Extend Plan Payments",
+          "branch": "document_/_artifact",
+          "confidence": 1.0
+        }
+      ],
+      "adapter_concepts": [
+        {
+          "iri": "https://folio.openlegalstandard.org/Gh1SKS0iT6CQVsb7yzbjow",
+          "preferred_label": "Home and Garden Equipment Repair and Maintenance",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R7aPdNazR2TDAE03Nhekjx",
+          "preferred_label": "Meal Break",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R9JcsdtYN2CUc5CfCTULHYC",
+          "preferred_label": "Child Support",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R8olDeBpZZbYdWS121VXEMQ",
+          "preferred_label": "Motion to Extend Plan Payments",
+          "branch": "",
+          "confidence": 1.0
+        }
+      ],
+      "legacy_unresolved": [],
+      "adapter_unresolved": []
+    },
+    {
+      "index": 4,
+      "headline": "Law Society to publish audit report on governance and workplace culture followin",
+      "raw_areas": [
+        "Corporate Governance Law",
+        "Defamation Law",
+        "Privacy Law"
+      ],
+      "raw_entities": [
+        "Law Enforcement Arrest Tracking Number",
+        "Law Minister"
+      ],
+      "raw_concepts": [
+        "Ig",
+        "Lease Obligations",
+        "L656 Redaction",
+        "Internal Medicine Negligence"
+      ],
+      "diff_fields": [
+        "entities",
+        "unresolved"
+      ],
+      "legacy_areas": [
+        {
+          "iri": "https://folio.openlegalstandard.org/RB7pLfw7zqXtd20kKg7EcOA",
+          "preferred_label": "Corporate Governance Law",
+          "branch": "areas_of_law",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RCL9tL1XOTncmAJsSYApAw",
+          "preferred_label": "Defamation Law",
+          "branch": "areas_of_law",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R8hJCf4Ih6iuFXsxeK7e6zU",
+          "preferred_label": "Privacy Law",
+          "branch": "areas_of_law",
+          "confidence": 1.0
+        }
+      ],
+      "adapter_areas": [
+        {
+          "iri": "https://folio.openlegalstandard.org/RB7pLfw7zqXtd20kKg7EcOA",
+          "preferred_label": "Corporate Governance Law",
+          "branch": "areas_of_law",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RCL9tL1XOTncmAJsSYApAw",
+          "preferred_label": "Defamation Law",
+          "branch": "areas_of_law",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R8hJCf4Ih6iuFXsxeK7e6zU",
+          "preferred_label": "Privacy Law",
+          "branch": "areas_of_law",
+          "confidence": 1.0
+        }
+      ],
+      "legacy_entities": [
+        {
+          "iri": "https://folio.openlegalstandard.org/R5PLLDprnqJRdq60whLLp6",
+          "preferred_label": "Law Enforcement Arrest Tracking Number",
+          "branch": "engagement_attributes",
+          "confidence": 1.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "Law Minister",
+          "branch": "unresolved",
+          "confidence": 0.0
+        }
+      ],
+      "adapter_entities": [
+        {
+          "iri": "https://folio.openlegalstandard.org/R5PLLDprnqJRdq60whLLp6",
+          "preferred_label": "Law Enforcement Arrest Tracking Number",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R2F1f694B8f127B683aD9c9b",
+          "preferred_label": "National Institute of Standards and Technology",
+          "branch": "",
+          "confidence": 0.9
+        }
+      ],
+      "legacy_concepts": [
+        {
+          "iri": "https://folio.openlegalstandard.org/R25B7be5E4c8a07E5ba2153f",
+          "preferred_label": "Ig",
+          "branch": "location",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RDMUsjTZ7MYlmJzfXob9Rfi",
+          "preferred_label": "Lease Obligations",
+          "branch": "financial_concepts_and_metrics",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RzRevQI04QCGyTSdEECdeQQ",
+          "preferred_label": "L656 Redaction",
+          "branch": "standards_compatibility",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R8KOOEzWFRtQJgpQNRToCPU",
+          "preferred_label": "Internal Medicine Negligence",
+          "branch": "objectives",
+          "confidence": 1.0
+        }
+      ],
+      "adapter_concepts": [
+        {
+          "iri": "https://folio.openlegalstandard.org/R25B7be5E4c8a07E5ba2153f",
+          "preferred_label": "Ig",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RDMUsjTZ7MYlmJzfXob9Rfi",
+          "preferred_label": "Lease Obligations",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RzRevQI04QCGyTSdEECdeQQ",
+          "preferred_label": "L656 Redaction",
+          "branch": "",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R8KOOEzWFRtQJgpQNRToCPU",
+          "preferred_label": "Internal Medicine Negligence",
+          "branch": "",
+          "confidence": 1.0
+        }
+      ],
+      "legacy_unresolved": [
+        "Law Minister"
+      ],
+      "adapter_unresolved": []
+    },
+    {
+      "index": 5,
+      "headline": "High Court holds in [2026] SGHC 138 that bona fide and substantial debt disputes",
+      "raw_areas": [
+        "Corporate Insolvency Law",
+        "Contract Law"
+      ],
+      "raw_entities": [
+        "High Court of Singapore",
+        "Mae Hong Son",
+        "Holding Company",
+        "Exam Preparation and Tutoring",
+        "s 124(1)(c) IRDA",
+        "s 125(1)(e) IRDA",
+        "Water Resources and Wetlands Law"
+      ],
+      "raw_concepts": [
+        "DEPRECATED Creditor Claims Practice",
+        "Dispute Service",
+        "Debt Agreement",
+        "Abuse of Process"
+      ],
+      "diff_fields": [
+        "entities",
+        "concepts",
+        "unresolved"
+      ],
+      "legacy_areas": [
+        {
+          "iri": "https://folio.openlegalstandard.org/RBGaYz0rr5Dh0Sjxu0Z6DHx",
+          "preferred_label": "Corporate Insolvency Law",
+          "branch": "areas_of_law",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RCIPwpgRpMs1eVz4vPid0pV",
+          "preferred_label": "Contract Law",
+          "branch": "areas_of_law",
+          "confidence": 1.0
+        }
+      ],
+      "adapter_areas": [
+        {
+          "iri": "https://folio.openlegalstandard.org/RBGaYz0rr5Dh0Sjxu0Z6DHx",
+          "preferred_label": "Corporate Insolvency Law",
+          "branch": "areas_of_law",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RCIPwpgRpMs1eVz4vPid0pV",
+          "preferred_label": "Contract Law",
+          "branch": "areas_of_law",
+          "confidence": 1.0
+        }
+      ],
+      "legacy_entities": [
+        {
+          "iri": null,
+          "preferred_label": "High Court of Singapore",
+          "branch": "sg_local",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R30E851C449da0A3c86D2742",
+          "preferred_label": "Mae Hong Son",
+          "branch": "location",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R9WYIrIeT3fTYMxfW0xZldF",
+          "preferred_label": "Holding Company",
+          "branch": "legal_entity",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/AtpClf7tR5SbFk363YGzRg",
+          "preferred_label": "Exam Preparation and Tutoring",
+          "branch": "industry_and_market",
+          "confidence": 1.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "s 124(1)(c) IRDA",
+          "branch": "unresolved",
+          "confidence": 0.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "s 125(1)(e) IRDA",
+          "branch": "unresolved",
+          "confidence": 0.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/R7KYATnZcNxJsZ1MQBADZ0x",
+          "preferred_label": "Water Resources and Wetlands Law",
+          "branch": "areas_of_law",
+          "confidence": 1.0
+        }
+      ],
+      "adapter_entities": [
+        {
+          "iri": null,
+          "preferred_label": "High Court of Singapore",
+          "branch": "sg_local",
+          "confidence": 1.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "Mae Hong Son",
+          "branch": "unresolved",
+          "confidence": 0.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "Holding Company",
+          "branch": "unresolved",
+          "confidence": 0.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "Exam Preparation and Tutoring",
+          "branch": "unresolved",
+          "confidence": 0.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "s 124(1)(c) IRDA",
+          "branch": "unresolved",
+          "confidence": 0.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "s 125(1)(e) IRDA",
+          "branch": "unresolved",
+          "confidence": 0.0
+        },
+        {
+          "iri": null,
+          "preferred_label": "Water Resources and Wetlands Law",
+          "branch": "unresolved",
+          "confidence": 0.0
+        }
+      ],
+      "legacy_concepts": [
+        {
+          "iri": "https://folio.openlegalstandard.org/R88zIAkD2h7CyGFRkVd2A1F",
+          "preferred_label": "DEPRECATED Creditor Claims Practice",
+          "branch": "zzz_-_sandbox:_under_construction",
+          "confidence": 1.0
+        },
+        {
+          "iri": "https://folio.openlegalstandard.org/RDigDgTiLFmt7iX3436yCOT",
+          "preferred_label": "Dispute Service",
+          "branch": "service",
+          "confidence": 1.0
+        }
+      ],
+      "adapter_concepts": [],
+      "legacy_unresolved": [
+        "s 124(1)(c) IRDA",
+        "s 125(1)(e) IRDA",
+        "Debt Agreement",
+        "Abuse of Process"
+      ],
+      "adapter_unresolved": [
+        "Mae Hong Son",
+        "Holding Company",
+        "Exam Preparation and Tutoring",
+        "s 124(1)(c) IRDA",
+        "s 125(1)(e) IRDA",
+        "Water Resources and Wetlands Law",
+        "DEPRECATED Creditor Claims Practice",
+        "Dispute Service",
+        "Debt Agreement",
+        "Abuse of Process"
+      ]
+    }
+  ],
+  "errors_list": []
+}

@@ -999,7 +999,7 @@ then converts these to `FolioRef` objects with standardised IRIs.
 
 Full pseudocode for both pipelines, FOLIO resolution, daily
 orchestrator, and notification filtering is maintained as a separate
-document: `enrichment-pipeline-pseudocode.md`.
+document: `enrichment-pipeline.md`.
 
 Note: the pseudocode predates the Zeeker and external-subscription
 decisions. Its collector functions are superseded by the Zeeker

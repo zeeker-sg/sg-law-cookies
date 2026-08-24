@@ -84,7 +84,7 @@ def test_resolve_venue_uses_forums_venues_branch():
     assert ref.iri == f"{FOLIO_API_BASE}/Rwisc"
     assert ref.preferred_label == "Supreme Court of Wisconsin"
     assert ref.branch == FORUMS_VENUES_BRANCH
-    assert ref.confidence == 1.0
+    assert ref.confidence == pytest.approx(0.99)
 
 
 @respx.mock
@@ -134,7 +134,7 @@ def test_resolve_legislation_uses_legal_authorities_branch():
     assert route.called
     assert ref.iri == f"{FOLIO_API_BASE}/Rfre"
     assert ref.branch == LEGAL_AUTHORITIES_BRANCH
-    assert ref.confidence == 1.0
+    assert ref.confidence == pytest.approx(0.99)
 
 
 @respx.mock
@@ -152,9 +152,13 @@ def test_resolve_legislation_api_failure_degrades_not_raises():
 @respx.mock
 def test_resolve_judgment_meta_resolves_all_layers():
     # Issue concepts go through /search/label (all branches) + taxonomy path.
-    respx.get(f"{FOLIO_API_BASE}/search/label").respond(
-        json={"results": [[_owl_class("Duty of Care", "Rdoc"), 95.0]]}
-    )
+    # "duty of care" resolves; "zorbulent quasimodality" gets no results (the
+    # mock only returns a match for the duty-of-care query, so the nonsense
+    # term degrades to an unresolved placeholder, not a false positive).
+    respx.get(
+        f"{FOLIO_API_BASE}/search/label", params={"query": "duty of care"}
+    ).respond(json={"results": [[_owl_class("Duty of Care", "Rdoc"), 95.0]]})
+    respx.get(f"{FOLIO_API_BASE}/search/label").respond(json={"results": []})
     respx.get(url__regex=rf"{FOLIO_API_BASE}/taxonomy/tree/path/.*").respond(
         json=_path_payload("Objectives")
     )
@@ -185,7 +189,7 @@ def test_resolve_judgment_meta_resolves_all_layers():
     assert concepts[0].iri == f"{FOLIO_API_BASE}/Rdoc"
     assert concepts[0].preferred_label == "Duty of Care"
     assert concepts[0].branch == "objectives"
-    assert concepts[0].confidence == 1.0
+    assert concepts[0].confidence == pytest.approx(0.95)
     # Unresolvable concept keeps its raw label as a placeholder, not dropped.
     assert concepts[1].iri is None
     assert concepts[1].preferred_label == "zorbulent quasimodality"
@@ -247,14 +251,16 @@ def test_resolve_judgment_meta_never_raises_on_api_failure():
 
 @pytest.mark.live
 def test_live_resolve_court_of_appeal():
+    from sg_law_cookies.folio_resolve_adapter import _search_branch_filtered
+
     with httpx.Client(timeout=30) as client:
         # Live FOLIO probe: the forums_venues branch filter is valid and
         # returns matches for "Court of Appeal" — but none are Singapore
         # courts (only US state courts, e.g. "Washington Court of Appeals"),
         # which is exactly why the local SG table must win.
-        results = folio._search_branch(client, "Court of Appeal", FORUMS_VENUES_BRANCH)
+        results = _search_branch_filtered(client, "Court of Appeal", FORUMS_VENUES_BRANCH)
         assert results, "forums_venues branch filter returned nothing live"
-        assert all("singapore" not in r.label.lower() for r in results)
+        assert all("singapore" not in concept.label.lower() for concept, _ in results)
 
         ref = resolve_venue(client, "Court of Appeal")
     assert ref.preferred_label == "Court of Appeal of Singapore"
