@@ -76,58 +76,65 @@ weaknesses that folio-resolve solves properly:
 
 ## Phases
 
-### Phase 0 — Spike (1-2 sessions)
+### Phase 0 — Spike ✅ (completed)
 
 **Goal:** Validate the library works for our data before committing to a
 full migration. Behind a feature flag, no production changes.
 
+**What was done:**
 1. `uv add folio-resolve` (core, pure-Python)
-2. Write a thin adapter module `src/sg_law_cookies/folio_resolve_adapter.py`:
-   - Load ontology labels from our existing `area_vocab.py` + the REST API
-     (or a cached snapshot) into `InMemoryOntology`
-   - Wrap `MatchPipeline` and expose a `resolve_label(term, branch?) -> FolioRef | None`
-     interface that returns our `FolioRef` type
-3. Add env flag `FOLIO_RESOLVE=1` to `config.py` that routes resolution
-   through the adapter instead of the existing `folio.py` functions
-4. Run the existing test suite with `FOLIO_RESOLVE=1` — fix any failures
-5. Run a side-by-side comparison: process N recent cookies through both paths,
-   diff the `folio_areas`, `folio_entities`, `folio_concepts`, and `unresolved`
-   lists. Log where they diverge.
+2. Wrote `src/sg_law_cookies/folio_resolve_adapter.py` with two approaches:
+   - **Attempt 1 (bulk fetch):** `InMemoryOntology` populated from REST API
+     at startup. Failed — FOLIO API returns 429 when bulk-fetching 8 branches.
+     4/10 cookies matched, 6/10 different (all unresolved due to empty ontology).
+   - **Attempt 2 (Option C — hybrid):** Custom `OntologyProvider` that wraps
+     the FOLIO REST API per-query (same network pattern as legacy), feeds
+     results through `MatchPipeline`'s gates, blocklist, and scoring.
+     **7/10 cookies matched**, 3/10 different (branch metadata missing,
+     rate-limiting, one false positive).
+3. Added `FOLIO_RESOLVE=1` env flag to `config.py` with delegation hooks
+   in `folio.py` (zero behavioral change without the flag)
+4. 15 adapter-specific tests with in-memory ontology (all passing)
+5. Side-by-side comparison script: `scripts/compare_folio_resolve.py`
+6. Comparison report: `docs/folio-resolve-comparison.json`
 
-**Exit criteria:**
-- Adapter works without errors on real data
-- Side-by-side comparison shows folio-resolve is at least as good as current
-  on entities/concepts, and better on compound headings / homonyms
-- No regressions in the test suite
+**Key findings:**
+- **Option C (hybrid) is the right approach.** No bulk ontology fetch needed.
+  Keep per-query REST API, add folio-resolve's gates/scoring on top.
+- **Branch metadata gap:** Provider returns `branch=""` because it doesn't
+  call `/taxonomy/tree/path/<id>`. Need lazy branch resolution.
+- **Rate limiting:** Both legacy and adapter hit 429s. Pre-existing issue.
+  Solution: share cache or add rate limiting.
+- **Score floor:** One false positive ("Law Minister" → "NIST" @ 0.9).
+  Tuning score_floor or adding LLM judge would help.
 
-**Deliverable:** A branch with the adapter, feature flag, and a comparison
-report (saved to `docs/folio-resolve-comparison.md` or similar).
-
-### Phase 1 — Core migration (2-3 sessions)
+### Phase 1 — Core migration
 
 **Goal:** Replace the search/match layer in `folio.py` with folio-resolve.
+Remove the feature flag — make folio-resolve the default.
 
-1. Replace `_search_all_branches()`, `_search_branch()`,
-   `_normalised_relevance()`, `pick_best_match()` with
-   `MatchPipeline.match()` calls
-2. Configure `PlaceNameGate` with Singapore place-name vocabulary
-   (Singapore, Johor, etc.) to prevent geographic false positives
-3. Port `sg_mappings.py` entries into a folio-resolve domain-prior or local
-   mapping layer — the hardcoded table becomes structured config that the
-   pipeline consults before hitting the ontology
-4. Keep `resolve_topic()` and `resolve_judgment_meta()` as the public
-   interface — they call into the adapter internally. Callers in
-   `pipeline.py`, `cli.py`, and `judgment.py` should not change.
-5. Update tests: mock the ontology instead of the REST API for unit tests;
-   keep live API tests behind the `@pytest.mark.live` marker
-6. Remove the feature flag once tests pass and comparison is clean
+1. **Add lazy branch resolution** to `RestApiOntologyProvider` — call
+   `/taxonomy/tree/path/<id>` per IRI (cached), same as legacy `_branch_for_iri`
+2. **Merge the adapter into `folio.py`** — the adapter becomes the
+   implementation, not a sidecar behind a flag. Remove the delegation
+   hooks and the `FOLIO_RESOLVE` env flag.
+3. **Delete legacy functions:** `_search_all_branches()`, `_search_branch()`,
+   `_normalised_relevance()`, `pick_best_match()`, `SearchResult`. The
+   `RestApiOntologyProvider` + `MatchPipeline` replace them.
+4. **Keep `sg_mappings.py`** as-is — it runs before the pipeline and
+   handles Singapore-specific entities. No need to port to domain-prior
+   yet (that's Phase 2).
+5. **Keep `area_vocab.py`** as-is — closed vocabulary lookup, upstream
+   of resolution.
+6. **Update tests:** Legacy respx-mocked tests need to mock the provider's
+   API calls instead of the old functions. Adapter tests already pass.
+7. **Pin folio-resolve version** in `pyproject.toml` (e.g. `==0.4.0`).
 
 **Exit criteria:**
-- All existing tests pass
-- `sg_mappings.py` is either removed or reduced to a thin config file
-- `folio.py` is significantly simpler (search/match logic delegated to
-  folio-resolve)
-- A manual spot-check of recent cookies shows correct resolution
+- All existing tests pass (updated for the new API call pattern)
+- `folio.py` is simpler (search/match logic delegated to folio-resolve)
+- No feature flag — folio-resolve is the default
+- Side-by-side comparison shows ≥90% SAME or better vs legacy
 
 ### Phase 2 — Capability adoption (optional, incremental)
 
@@ -161,23 +168,22 @@ Each capability is independent and can be adopted when needed:
 
 ---
 
-## Open questions
+## Open questions (resolved by Phase 0)
 
-1. **Ontology loading:** Load from REST API snapshot (cached JSON, refreshed
-   per run) or use `[folio]` extra (folio-python live adapter)? Snapshot is
-   simpler and deterministic; folio-python is more current but adds a
-   dependency.
+1. **Ontology loading:** ~~Load from REST API snapshot or use `[folio]` extra?~~
+   **Resolved:** Neither. Option C — keep per-query REST API, wrap in a
+   custom `OntologyProvider`. No bulk fetch, no in-memory ontology.
 
-2. **Domain-prior mechanism:** Should `sg_mappings.py` entries become
-   folio-resolve `DomainPrior` config, or stay as a local lookup table that
-   runs before the pipeline? Need to understand folio-resolve's domain-prior
-   API better (spike will clarify).
+2. **Domain-prior mechanism:** ~~Should `sg_mappings.py` become `DomainPrior`?~~
+   **Resolved:** Keep `sg_mappings.py` as-is for Phase 1. It runs before
+   the pipeline. Domain-prior adoption deferred to Phase 2.
 
-3. **Branch routing:** folio-resolve resolves across all branches by default.
-   Our current code routes entities to all branches, concepts to all
-   branches, venues to `forums_venues`, legislation to `legal_authorities`.
-   Need to map this to folio-resolve's branch-filtering mechanism.
+3. **Branch routing:** ~~How to map venue/legislation branch filters?~~
+   **Resolved:** Use `_resolve_branch_filtered()` for venue/legislation
+   (branch-filtered `/search/query` + folio-resolve scoring). Use
+   `MatchPipeline.match()` for concepts/entities (all-branches
+   `/search/label` + gates).
 
-4. **`FolioRef` adapter shape:** folio-resolve returns its own result types
-   with scores on a 0-100 scale; our `FolioRef.confidence` is 0.0-1.0. Need a
-   normalisation step in the adapter.
+4. **`FolioRef` adapter shape:** ~~Score normalisation?~~
+   **Resolved:** folio-resolve scores 0-100 → `FolioRef.confidence` 0.0-1.0.
+   Divide by 100.
