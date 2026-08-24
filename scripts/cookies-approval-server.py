@@ -222,10 +222,17 @@ def update_discord_message_status(
     embed["color"] = ACTIONED_COLOR
 
     # Update footer with reviewer + timestamp.
+    # Preserve the original Cookie ID in the footer so the comment
+    # scanner can still find this embed after it's been actioned.
+    import re as _re
+    old_footer = embed.get("footer", {}).get("text", "")
+    cookie_id_match = _re.search(r"Cookie ID:\s*([a-f0-9]+)", old_footer, _re.IGNORECASE)
     ts = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime())
     footer_text = f"{badge} by {reviewer} • {ts}"
     if reason:
         footer_text += f" • reason: {reason[:100]}"
+    if cookie_id_match:
+        footer_text += f" • Cookie ID: {cookie_id_match.group(1)}"
     embed["footer"] = {"text": footer_text[:300]}
 
     # Send the edit with empty components (removes buttons).
