@@ -176,6 +176,6 @@ uv run cookies backup
 
 echo "==> build + deploy site"
 uv run cookies build --out dist
-npx wrangler pages deploy dist --project-name sg-law-cookies --commit-dirty=true
+npx wrangler pages deploy dist --project-name sg-law-cookies --branch main --commit-dirty=true
 
 echo "==> cycle complete"
