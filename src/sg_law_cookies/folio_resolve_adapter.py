@@ -36,6 +36,7 @@ from folio_resolve import (
 )
 
 from sg_law_cookies.area_vocab import AREA_IRI_BY_LABEL
+from sg_law_cookies.area_mappings import lookup_local_area
 from sg_law_cookies.models import FolioRef, JudgmentMeta, TopicExtraction
 from sg_law_cookies.sg_mappings import lookup_sg_entity
 
@@ -100,9 +101,13 @@ class RestApiOntologyProvider:
 
         Uses GET /search/label?query=<q> which returns fuzzy matches
         across all branches with scores on a 0-100 scale. The API has
-        a junk floor around 90, so raw scores are only trusted when the
-        candidate label shares a token with the query — but the
-        MatchPipeline's gates handle this filtering, not us.
+        a junk floor around 90 — it returns semantically unrelated labels
+        (country names, US courts, industry codes) at score 90 for almost
+        any query. We re-score every candidate with
+        ``compute_relevance_score`` (word-order-invariant content-word
+        overlap) so that labels with zero token overlap score 0.0 and
+        fall below the pipeline's score floor. The gates then handle
+        the remaining place-name / short-label edge cases.
         """
         key = query.lower().strip()
         if key in self._search_cache:
@@ -124,12 +129,25 @@ class RestApiOntologyProvider:
             self._search_cache[key] = results
             return results
 
+        from folio_resolve.scoring import compute_relevance_score, content_words
+
+        query_content = content_words(query)
+
         for cls, api_score in raw:
             iri = cls.get("iri")
             label = cls.get("label")
             if not iri or not label:
                 continue
-            score = float(api_score)
+            # Re-score with word-overlap to filter out the API's junk
+            # floor. A candidate like "Arkansas State Courts" returned
+            # for query "apparent bias" has zero content-word overlap and
+            # scores 0.0, so it never reaches the pipeline's gates.
+            rescored = compute_relevance_score(
+                query_content, query, label,
+                synonyms=cls.get("alternative_labels", []),
+            )
+            if rescored <= 0.0:
+                continue
             # Derive branch from the taxonomy path (lazy, cached).
             branch = self._branch_for_iri(iri)
             concept = Concept(
@@ -139,7 +157,7 @@ class RestApiOntologyProvider:
                 alternative_labels=tuple(cls.get("alternative_labels", [])),
             )
             self._concept_cache[iri] = concept
-            results.append((concept, score))
+            results.append((concept, rescored))
 
         # Sort by score descending, then IRI for determinism
         results.sort(key=lambda pair: (-pair[1], pair[0].iri))
@@ -204,6 +222,12 @@ def _build_pipeline(client: httpx.Client) -> MatchPipeline:
         place_gate=PlaceNameGate(
             extra_tokens=_SG_PLACE_TOKENS,
             extra_markers=("republic of", "city of"),
+            # FOLIO's forums_and_venues branch contains US state/county
+            # courts that the API returns as junk matches for any query.
+            # Without this marker, "Arkansas State Courts" (returned for
+            # "apparent bias") passes the gate at score 90 because the
+            # built-in _PLACE_BRANCH_MARKERS don't include "forums".
+            extra_branch_markers=("forums_and_venues",),
         ),
         score_floor=_SCORE_FLOOR,
     )
@@ -311,6 +335,7 @@ def _resolve_branch_filtered(
     place_gate = PlaceNameGate(
         extra_tokens=_SG_PLACE_TOKENS,
         extra_markers=("republic of", "city of"),
+        extra_branch_markers=("forums_and_venues",),
     )
     short_gate = ShortLabelGate()
 
@@ -354,7 +379,7 @@ def resolve_topic(
     2. Entities: local SG mappings first, then pipeline.
     3. Concepts: pipeline across all branches.
     """
-    # Pass 1: areas of law — closed vocabulary, exact-label lookup.
+    # Pass 1: areas of law — closed vocabulary, then local area mappings.
     seen_areas: set[str] = set()
     for raw_area in topic.raw_areas:
         if raw_area in seen_areas:
@@ -371,7 +396,13 @@ def resolve_topic(
                 )
             )
         else:
-            topic.unresolved.append(raw_area)
+            # Try local area mappings for areas not in FOLIO's taxonomy
+            # (e.g. Arbitration Law, Ethics and Professional Responsibility).
+            local_area = lookup_local_area(raw_area)
+            if local_area is not None:
+                topic.folio_areas.append(local_area)
+            else:
+                topic.unresolved.append(raw_area)
 
     # Pass 2: entities — local Singapore mappings first, then pipeline.
     for raw_entity in topic.raw_entities:
