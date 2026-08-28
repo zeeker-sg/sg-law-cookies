@@ -189,7 +189,7 @@ def test_resolve_judgment_meta_resolves_all_layers():
     assert concepts[0].iri == f"{FOLIO_API_BASE}/Rdoc"
     assert concepts[0].preferred_label == "Duty of Care"
     assert concepts[0].branch == "objectives"
-    assert concepts[0].confidence == pytest.approx(0.95)
+    assert concepts[0].confidence == pytest.approx(0.99)  # exact match rescored
     # Unresolvable concept keeps its raw label as a placeholder, not dropped.
     assert concepts[1].iri is None
     assert concepts[1].preferred_label == "zorbulent quasimodality"
