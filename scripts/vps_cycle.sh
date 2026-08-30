@@ -54,6 +54,25 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
     exit 1
 fi
 
+# In-sync check: deploys must come from commits CI has actually tested on
+# GitHub. A stale, diverged, or unpushed local branch would silently deploy
+# unreviewed code. Escalate via COOKIES_SKIP_ORIGIN_CHECK=1 for a single run
+# only when GitHub is unreachable and the operator accepts the risk.
+if [[ "${COOKIES_SKIP_ORIGIN_CHECK:-0}" != "1" ]]; then
+    if ! git fetch origin "$PROD_BRANCH" --quiet 2>/dev/null; then
+        echo "FATAL: cannot reach origin — cannot verify the tree is in sync with ${PROD_BRANCH}." >&2
+        echo "       Fix connectivity, or override once with COOKIES_SKIP_ORIGIN_CHECK=1." >&2
+        exit 1
+    fi
+    origin_head="$(git rev-parse "origin/${PROD_BRANCH}" 2>/dev/null || true)"
+    local_head="$(git rev-parse HEAD 2>/dev/null || true)"
+    if [[ -n "$origin_head" && "$origin_head" != "$local_head" ]]; then
+        echo "FATAL: local ${PROD_BRANCH} (${local_head:0:12}) is not in sync with origin (${origin_head:0:12})." >&2
+        echo "       Run: git pull --ff-only   (deploys must come from CI-tested commits)." >&2
+        exit 1
+    fi
+fi
+
 set -a; . ./.env; set +a
 
 LIMIT="${COOKIES_RUN_LIMIT:-100}"
