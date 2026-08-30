@@ -237,6 +237,35 @@ def _cmd_restore(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _cmd_export_public(args: argparse.Namespace, settings: Settings) -> int:
+    from sg_law_cookies.public_export import ExportError, export_public_db
+
+    db_path = Path(args.db) if args.db else settings.db_path
+    out_path = Path(args.out)
+    try:
+        result = export_public_db(
+            db_path,
+            out_path,
+            upload=args.upload,
+            bucket=args.bucket,
+        )
+    except ExportError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(
+        f"exported {result.cookies} cookies, {result.judgments} judgments, "
+        f"{result.judgment_issues} judgment issues, "
+        f"{result.unresolved_terms} unresolved terms "
+        f"({result.size_bytes:,} bytes) -> {result.db_path}"
+    )
+    if result.s3_key:
+        print(f"uploaded -> s3://{result.s3_bucket}/{result.s3_key}")
+    return 0
+
+
 def _cmd_backup(args: argparse.Namespace, settings: Settings) -> int:
     from sg_law_cookies.backup import BackupError, backup_db
 
@@ -334,6 +363,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="download the canonical DB from S3, replacing the local one (env: S3_BUCKET, AWS keys)",
     )
     restore_p.set_defaults(func=_cmd_restore)
+
+    export_p = sub.add_parser(
+        "export-public",
+        help=(
+            "derive the public cookies dataset for data.zeeker.sg "
+            "(env: S3_BUCKET, AWS keys when --upload)"
+        ),
+    )
+    export_p.add_argument(
+        "--db",
+        help="source DB path (default: the configured cookies DB)",
+    )
+    export_p.add_argument(
+        "--out",
+        default="./export/sg-law-cookies.db",
+        help="where to write the export DB (default ./export/sg-law-cookies.db)",
+    )
+    export_p.add_argument(
+        "--upload",
+        action="store_true",
+        help="upload the export to S3 latest/sg-law-cookies.db (publishes to data.zeeker.sg)",
+    )
+    export_p.add_argument(
+        "--bucket",
+        help="override the S3 bucket (default $S3_BUCKET)",
+    )
+    export_p.set_defaults(func=_cmd_export_public)
 
     return parser
 

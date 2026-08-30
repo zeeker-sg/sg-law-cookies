@@ -10,7 +10,8 @@
 #   3. Backup local DB to S3 (preserve any cookies approved via Discord
 #      since the last cycle), then restore the canonical DB from S3
 #   4. Ingest all active sources from Datasette
-#   5. Backup + build + deploy
+#   5. Backup + export the public dataset (latest/sg-law-cookies.db —
+#      what data.zeeker.sg serves) + build + deploy
 #
 # Requires in .env (same directory as the repo root):
 #   S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_ENDPOINT_URL
@@ -219,6 +220,9 @@ done
 
 echo "==> backup updated DB to S3"
 uv run cookies backup
+
+echo "==> export public dataset to S3 (publishes to data.zeeker.sg)"
+uv run cookies export-public --upload
 
 echo "==> build + deploy site"
 uv run cookies build --out dist
