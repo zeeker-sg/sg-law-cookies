@@ -5,6 +5,7 @@ Zeeker HTTP is mocked with respx; all LLM backends are stubbed
 """
 
 import copy
+import json
 
 import httpx
 import pytest
@@ -172,9 +173,16 @@ def test_run_source_processes_judgment_end_to_end(conn):
     (cookie,) = result.cookies
     assert cookie.headline == "High Court holds the clause was not a penalty"
 
-    stored = db.get_cookie(conn, cookie.id)
+    # Human-in-the-loop: the judgment pipeline stages new cookies in
+    # pending_cookies (promoted to the live cookies table only after Discord
+    # approval or 72h auto-approve), so assertions read the pending table.
+    pending_rows = db.list_pending_cookies(conn)
+    assert len(pending_rows) == 1
+    (pending_row,) = pending_rows
+    stored = db.get_pending_cookie(conn, pending_row["id"])
     assert stored is not None
-    source = db.get_source(conn, stored.source_ids[0])
+    source_ids = json.loads(stored["source_ids"])
+    source = db.get_source(conn, source_ids[0])
     assert source.item_type == "judgment"
     assert source.source_url == JUDGMENT_ROW["source_url"]
 

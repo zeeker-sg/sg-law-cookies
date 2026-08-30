@@ -27,6 +27,52 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# ── Governance guard ────────────────────────────────────────────────
+# This script deploys to production (S3 canonical DB + Cloudflare Pages)
+# and is invoked by cron in the production checkout. Refuse to run from
+# any branch other than the production branch, or with uncommitted
+# tracked changes in the working tree, so work-in-progress on a feature
+# branch can never reach production by accident.
+PROD_BRANCH="${COOKIES_PROD_BRANCH:-main}"
+
+current_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+if [[ -z "$current_branch" ]]; then
+    current_branch="<not a git checkout>"
+elif [[ "$current_branch" == "HEAD" ]]; then
+    current_branch="<detached HEAD>"
+fi
+if [[ "$current_branch" != "$PROD_BRANCH" ]]; then
+    echo "FATAL: refusing to deploy from branch ${current_branch}." >&2
+    echo "       vps_cycle.sh must run on the production branch (${PROD_BRANCH})." >&2
+    echo "       Checkout ${PROD_BRANCH}, or override once with COOKIES_PROD_BRANCH=<branch>." >&2
+    exit 1
+fi
+
+if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo "FATAL: refusing to deploy with uncommitted tracked changes." >&2
+    echo "       Commit or stash them first — production deploys must come from a clean tree." >&2
+    exit 1
+fi
+
+# In-sync check: deploys must come from commits CI has actually tested on
+# GitHub. A stale, diverged, or unpushed local branch would silently deploy
+# unreviewed code. Escalate via COOKIES_SKIP_ORIGIN_CHECK=1 for a single run
+# only when GitHub is unreachable and the operator accepts the risk.
+if [[ "${COOKIES_SKIP_ORIGIN_CHECK:-0}" != "1" ]]; then
+    if ! git fetch origin "$PROD_BRANCH" --quiet 2>/dev/null; then
+        echo "FATAL: cannot reach origin — cannot verify the tree is in sync with ${PROD_BRANCH}." >&2
+        echo "       Fix connectivity, or override once with COOKIES_SKIP_ORIGIN_CHECK=1." >&2
+        exit 1
+    fi
+    origin_head="$(git rev-parse "origin/${PROD_BRANCH}" 2>/dev/null || true)"
+    local_head="$(git rev-parse HEAD 2>/dev/null || true)"
+    if [[ -n "$origin_head" && "$origin_head" != "$local_head" ]]; then
+        echo "FATAL: local ${PROD_BRANCH} (${local_head:0:12}) is not in sync with origin (${origin_head:0:12})." >&2
+        echo "       Run: git pull --ff-only   (deploys must come from CI-tested commits)." >&2
+        exit 1
+    fi
+fi
+
 set -a; . ./.env; set +a
 
 LIMIT="${COOKIES_RUN_LIMIT:-100}"

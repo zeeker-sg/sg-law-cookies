@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest (live tests excluded)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3 (uv 0.11.14)
+        with:
+          version: "0.11.14"
+          python-version: "3.12"
+
+      - name: Install dependencies (uv.lock)
+        run: uv sync --locked
+
+      # -m 'not live' is also set via addopts in pyproject.toml; repeating it
+      # here keeps the exclusion explicit even if addopts ever changes.
+      - name: Run test suite
+        run: uv run pytest -m "not live" -q
