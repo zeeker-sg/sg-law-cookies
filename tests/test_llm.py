@@ -8,6 +8,7 @@ import respx
 from sg_law_cookies.extraction import ExtractionError
 from sg_law_cookies.llm import OllamaBackend, as_backend
 from sg_law_cookies.models import RawItem
+from sg_law_cookies.prompts import NEWS_SYSTEM_PROMPT
 
 RAW_ITEM = RawItem(
     source_url="https://www.singaporelawwatch.sg/Headlines/example",
@@ -46,9 +47,14 @@ def test_ollama_backend_parses_topics():
     assert topics[0].significance == "high"
     body = json.loads(route.calls[0].request.content)
     assert body["model"] == "qwen3:8b"
-    assert body["format"]["properties"]["topics"]  # schema-constrained output
+    # format=schema was dropped from the payload — Ollama's schema constraint
+    # is unreliable with cloud-routed models, so the schema instead ships as a
+    # JSON example appended to the system prompt (see OllamaBackend.structured).
+    assert "format" not in body
     assert body["stream"] is False
     assert body["think"] is False  # reasoning traces off by default
+    assert body["messages"][0]["content"].startswith(NEWS_SYSTEM_PROMPT)
+    assert '"topics"' in body["messages"][0]["content"]  # schema embedded as JSON example
 
 
 @respx.mock

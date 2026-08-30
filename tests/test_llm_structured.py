@@ -185,8 +185,13 @@ def test_ollama_structured_returns_parsed_dict():
     assert body["model"] == "qwen3:8b"
     assert body["stream"] is False
     assert body["think"] is False
-    assert body["format"] == JUDGMENT_STRUCTURE_TOOL["input_schema"]
-    assert body["messages"][0] == {"role": "system", "content": JUDGMENT_STRUCTURE}
+    # format=schema was dropped from the payload — Ollama's schema constraint
+    # is unreliable with cloud-routed models, so the schema instead ships as a
+    # JSON example appended to the system prompt (see OllamaBackend.structured).
+    assert "format" not in body
+    assert body["messages"][0]["role"] == "system"
+    assert body["messages"][0]["content"].startswith(JUDGMENT_STRUCTURE)
+    assert '"citation"' in body["messages"][0]["content"]  # schema embedded as JSON example
     assert body["messages"][1] == {
         "role": "user",
         "content": "Full judgment text here.",
