@@ -111,8 +111,14 @@ def build_embed(row) -> dict:
         })
 
     color_map = {"high": 0xED4245, "medium": 0xFEE75C, "low": 0x57F287}
+    emoji = ITEM_TYPE_EMOJI.get(item_type, "📄")
+    title = f"{emoji} {row['headline']}"
+    # Discord embed titles are capped at 256 chars (error 50035). Truncate
+    # long headlines so the post still goes out instead of failing.
+    if len(title) > 256:
+        title = title[:255] + "…"
     embed = {
-        "title": f"{ITEM_TYPE_EMOJI.get(item_type, '📄')} {row['headline']}",
+        "title": title,
         "fields": fields,
         "color": color_map.get(significance, 0x5865F2),
         "footer": {"text": f"Cookie ID: {row['id'][:8]}"},
