@@ -281,6 +281,42 @@ def _cmd_backup(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _cmd_re_enrich(args: argparse.Namespace, settings: Settings) -> int:
+    from sg_law_cookies.re_enrich import re_enrich
+
+    conn = db.init_db(settings.db_path)
+    llm = _build_llm(settings, pipeline="news")
+    if llm is None:
+        return 1
+
+    def _progress(i, total, cookie, status, detail):
+        print(f"[{i + 1}/{total}] {status:10s}  {cookie.headline[:60]}  {detail}")
+
+    with httpx.Client(timeout=30.0) as folio_client:
+        report = re_enrich(
+            conn,
+            llm,
+            folio_client,
+            dry_run=args.dry_run,
+            limit=args.limit,
+            progress=_progress,
+        )
+
+    verb = "would change" if args.dry_run else "changed"
+    print(
+        f"\n{report.considered}/{report.total} considered; "
+        f"{verb} {report.changed} "
+        f"({report.re_extracted} re-extracted, {report.failed} failed, "
+        f"{report.skipped_clean} already clean, "
+        f"{report.skipped_no_source} no source)"
+    )
+    if not args.dry_run and report.changed:
+        for day_iso in db.list_cookie_dates(conn):
+            db.save_daily_stats(conn, db.compute_daily_stats(conn, date.fromisoformat(day_iso)))
+        print(f"recomputed daily stats for {len(db.list_cookie_dates(conn))} days")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cookies", description="SG Law Cookies pipeline")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -343,6 +379,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run", action="store_true", help="show changes without writing them"
     )
     backfill_p.set_defaults(func=_cmd_backfill_areas)
+
+    re_enrich_p = sub.add_parser(
+        "re-enrich",
+        help="re-extract and re-resolve FOLIO tags for cookies with garbage tags",
+    )
+    re_enrich_p.add_argument(
+        "--dry-run", action="store_true", help="show changes without writing them"
+    )
+    re_enrich_p.add_argument(
+        "--limit", type=int, default=None, help="max cookies to process (default: all)"
+    )
+    re_enrich_p.set_defaults(func=_cmd_re_enrich)
 
     build_p = sub.add_parser("build", help="render the static site")
     build_p.add_argument("--out", default="./dist", help="output directory (default ./dist)")
