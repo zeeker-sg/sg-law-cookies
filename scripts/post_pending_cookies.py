@@ -31,6 +31,33 @@ SIGNIFICANCE_EMOJI = {"high": "🔴", "medium": "🟡", "low": "⚪"}
 SIGNIFICANCE_LABEL = {"high": "Act on", "medium": "Be aware of", "low": "Track"}
 ITEM_TYPE_EMOJI = {"news": "📰", "judgment": "⚖️"}
 
+DISCORD_EMBED_TITLE_LIMIT = 256
+
+
+def _utf16_len(text: str) -> int:
+    """Length of `text` in UTF-16 code units — how Discord counts embed limits."""
+    return len(text.encode("utf-16-le")) // 2
+
+
+def truncate_title(title: str, limit: int = DISCORD_EMBED_TITLE_LIMIT) -> str:
+    """Truncate an embed title to Discord's 256-unit cap (error 50035).
+
+    Discord measures embed field limits in UTF-16 code units, not Python
+    characters: non-BMP characters (e.g. the 📄/📰/⚖️ emoji) count as 2
+    units each. Truncate by unit weight so emoji never push a title past
+    the cap, reserving one unit for the trailing ellipsis.
+    """
+    if _utf16_len(title) <= limit:
+        return title
+    keep = limit - 1  # room for the ellipsis (U+2026, BMP → 1 unit)
+    units = 0
+    for idx, ch in enumerate(title):
+        w = 2 if ord(ch) > 0xFFFF else 1
+        if units + w > keep:
+            return title[:idx] + "…"
+        units += w
+    return title + "…"  # unreachable: short titles returned above
+
 
 def _env(key: str, default: str | None = None) -> str | None:
     val = os.environ.get(key, default)
@@ -112,7 +139,7 @@ def build_embed(row) -> dict:
 
     color_map = {"high": 0xED4245, "medium": 0xFEE75C, "low": 0x57F287}
     embed = {
-        "title": f"{ITEM_TYPE_EMOJI.get(item_type, '📄')} {row['headline']}",
+        "title": truncate_title(f"{ITEM_TYPE_EMOJI.get(item_type, '📄')} {row['headline']}"),
         "fields": fields,
         "color": color_map.get(significance, 0x5865F2),
         "footer": {"text": f"Cookie ID: {row['id'][:8]}"},
