@@ -252,7 +252,7 @@ def get_source(conn: sqlite3.Connection, source_id: str) -> Source | None:
 # ── cookies ──────────────────────────────────────────────────────────
 
 
-def save_cookie(conn: sqlite3.Connection, cookie: Cookie) -> None:
+def save_cookie(conn: sqlite3.Connection, cookie: Cookie, *, commit: bool = True) -> None:
     """Write the cookie row plus its cookie_sources links."""
     # admitted_at defaults to now if not set (e.g. direct test inserts).
     admitted = cookie.admitted_at or datetime.now(timezone.utc)
@@ -297,7 +297,8 @@ def save_cookie(conn: sqlite3.Connection, cookie: Cookie) -> None:
         "INSERT OR IGNORE INTO cookie_sources (cookie_id, source_id) VALUES (?, ?)",
         [(cookie.id, sid) for sid in cookie.source_ids],
     )
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
 def link_cookie_source(conn: sqlite3.Connection, cookie_id: str, source_id: str) -> None:
@@ -581,7 +582,7 @@ def update_pending_cookie_text(
 
 
 def list_auto_approvable(
-    conn: sqlite3.Connection, max_age_hours: int = 72
+    conn: sqlite3.Connection, max_age_hours: int = 72, *, exclude_news: bool = False
 ) -> list[sqlite3.Row]:
     """Pending cookies older than max_age_hours, still in 'pending' status."""
     cutoff = (
@@ -591,14 +592,15 @@ def list_auto_approvable(
         """
         SELECT * FROM pending_cookies
         WHERE review_status = 'pending' AND created_at < ?
+          AND (? = 0 OR item_type != 'news')
         ORDER BY created_at
         """,
-        (cutoff,),
+        (cutoff, int(exclude_news)),
     ).fetchall()
 
 
 def auto_approve_pending(
-    conn: sqlite3.Connection, max_age_hours: int = 72
+    conn: sqlite3.Connection, max_age_hours: int = 72, *, exclude_news: bool = False
 ) -> list[str]:
     """Promote all pending cookies older than max_age_hours to live cookies.
 
@@ -607,7 +609,7 @@ def auto_approve_pending(
     auto-approved is lost when the pending row is deleted, so we log
     this separately if needed).
     """
-    rows = list_auto_approvable(conn, max_age_hours)
+    rows = list_auto_approvable(conn, max_age_hours, exclude_news=exclude_news)
     promoted: list[str] = []
     for row in rows:
         # Mark as auto-approved for any audit log before promoting.

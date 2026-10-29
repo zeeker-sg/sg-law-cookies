@@ -79,6 +79,7 @@ def process_news(
     llm: object,
     folio_client: httpx.Client,
     model: str = DEFAULT_MODEL,
+    auto_approve_news: bool = False,
 ) -> list[Cookie]:
     """Extract -> FOLIO resolution -> dedup -> store (PRD section 4.1).
 
@@ -93,6 +94,12 @@ def process_news(
     topics = as_backend(llm, model).extract_topics(raw_item)
     for topic in topics:
         resolve_topic(topic, folio_client)
+    if auto_approve_news and raw_item.item_type == "news":
+        # Reject invalid automatic-admission output before source storage so a
+        # failed item remains retryable instead of looking already ingested.
+        if any(not value.strip() for topic in topics for value in
+               (topic.headline, topic.summary, topic.why_it_matters)):
+            raise PipelineError("news auto-approval: blank required text")
 
     source = Source(
         source_url=raw_item.source_url,
@@ -155,9 +162,19 @@ def process_news(
         # Human-in-the-loop: cookies go to the pending review table,
         # not the live cookies table.  They are promoted to the live
         # site only after Discord approval or 72h auto-approve.
-        db.save_pending_cookie(
-            conn, cookie, item_type=raw_item.item_type, source_url=raw_item.source_url
-        )
+        if auto_approve_news and raw_item.item_type == "news":
+            # Only newly generated, validated news enters this branch. Existing
+            # pending sources return above; rejected/regenerated drafts use their
+            # own review path. Preserve duplicate flags and source links.
+            from sg_law_cookies.news_approval import validate_news_cookie
+
+            validate_news_cookie(conn, cookie)
+            db.save_cookie(conn, cookie)
+            recent.append(cookie)
+        else:
+            db.save_pending_cookie(
+                conn, cookie, item_type=raw_item.item_type, source_url=raw_item.source_url
+            )
         if original is not None:
             # Duplicates are flagged, not deleted; the new source corroborates
             # the original cookie (PRD sections 2.1, 4.1 step 3).
@@ -194,6 +211,7 @@ def run_source(
     limit: int = 100,
     dry_run: bool = False,
     model: str = DEFAULT_MODEL,
+    auto_approve_news: bool = False,
 ) -> RunResult:
     """Fetch rows newer than the watermark and process each through the
     news or judgment pipeline. The watermark advances only after a
@@ -279,7 +297,8 @@ def run_source(
             )
         else:
             result.cookies.extend(
-                process_news(raw_item, conn, llm, folio_client, model=model)
+                process_news(raw_item, conn, llm, folio_client, model=model,
+                             auto_approve_news=auto_approve_news)
             )
         result.processed += 1
         if watermark is not None:

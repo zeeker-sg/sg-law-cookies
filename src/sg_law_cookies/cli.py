@@ -1,7 +1,9 @@
 """Command-line entry point: init-db, discover, run, stats (PRD section 8)."""
 
 import argparse
+import json
 import os
+import sqlite3
 import sys
 from datetime import date
 from pathlib import Path
@@ -153,6 +155,7 @@ def _cmd_run(args: argparse.Namespace, settings: Settings) -> int:
                 limit=args.limit,
                 dry_run=args.dry_run,
                 model=settings.model,
+                auto_approve_news=settings.auto_approve_news,
             )
         except PipelineError as exc:
             print(f"error: {exc}", file=sys.stderr)
@@ -168,6 +171,34 @@ def _cmd_run(args: argparse.Namespace, settings: Settings) -> int:
             f"{len(result.cookies)} cookies, watermark={result.watermark}"
         )
     return 0
+
+
+def _cmd_approve_news(args: argparse.Namespace, settings: Settings) -> int:
+    from sg_law_cookies.news_approval import (
+        NewsApprovalError, apply_pending_news, open_news_db, plan_pending_news,
+    )
+
+    try:
+        if args.apply:
+            if not settings.auto_approve_news:
+                raise NewsApprovalError("COOKIES_AUTO_APPROVE_NEWS must be enabled")
+            if not args.backup or not args.expected_plan:
+                raise NewsApprovalError("--apply requires --backup and --expected-plan")
+            result = apply_pending_news(settings.db_path, Path(args.backup),
+                                        json.loads(Path(args.expected_plan).read_text()))
+        else:
+            conn = open_news_db(settings.db_path)
+            try:
+                result = plan_pending_news(conn).report()
+                result["action"] = "dry-run"
+                result["auto_approve_news_enabled"] = settings.auto_approve_news
+            finally:
+                conn.close()
+        print(json.dumps(result, sort_keys=True))
+        return 0
+    except (NewsApprovalError, OSError, ValueError, TypeError, KeyError, sqlite3.Error) as exc:
+        print(f"news approval failed: {exc}", file=sys.stderr)
+        return 1
 
 
 def _cmd_stats(args: argparse.Namespace, settings: Settings) -> int:
@@ -320,6 +351,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="list pending items without LLM calls or writes",
     )
     run_p.set_defaults(func=_cmd_run)
+
+    approve_p = sub.add_parser("approve-news", help="review/apply a news-only backlog plan; default read-only")
+    mode = approve_p.add_mutually_exclusive_group()
+    mode.add_argument("--apply", action="store_true")
+    mode.add_argument("--dry-run", action="store_true")
+    approve_p.add_argument("--expected-plan", help="JSON from an earlier dry-run (required for apply)")
+    approve_p.add_argument("--backup", help="new private SQLite backup path (required for apply)")
+    approve_p.set_defaults(func=_cmd_approve_news)
 
     stats_p = sub.add_parser("stats", help="compute and store daily stats")
     stats_p.add_argument("--date", help="YYYY-MM-DD (default: today)")
