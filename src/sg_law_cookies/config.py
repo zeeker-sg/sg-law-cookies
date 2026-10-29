@@ -50,6 +50,7 @@ class Settings:
     judgment_ollama_model: str
     # Datasette API endpoint (default public, override for local)
     zeeker_base_url: str
+    auto_approve_news: bool = False
 
 
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
@@ -70,4 +71,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         judgment_ollama_host=env.get("JUDGMENT_OLLAMA_HOST", ""),
         judgment_ollama_model=env.get("JUDGMENT_OLLAMA_MODEL", ""),
         zeeker_base_url=env.get("ZEEKER_BASE_URL", "https://data.zeeker.sg"),
+        auto_approve_news=_is_truthy(env.get("COOKIES_AUTO_APPROVE_NEWS")),
     )

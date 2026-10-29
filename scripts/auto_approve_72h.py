@@ -48,7 +48,11 @@ def main() -> int:
 
     max_age = int(os.environ.get("COOKIES_AUTO_APPROVE_HOURS", "72"))
 
-    promoted = db.auto_approve_pending(conn, max_age_hours=max_age)
+    # News follows the immediate validated path / explicitly planned backlog
+    # batch when enabled. Never age-promote its rejected/invalid review leftovers.
+    promoted = db.auto_approve_pending(
+        conn, max_age_hours=max_age, exclude_news=settings.auto_approve_news
+    )
 
     if promoted:
         print(f"auto-approved {len(promoted)} cookie(s) (older than {max_age}h)")
