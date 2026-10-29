@@ -5,6 +5,9 @@ import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+from sg_law_cookies import foundation
+from sg_law_cookies.foundation import transaction as write_transaction
+
 from sg_law_cookies.models import (
     CaseCitation,
     Cookie,
@@ -156,21 +159,29 @@ CREATE TABLE IF NOT EXISTS rejected_cookies (
 """
 
 
-def init_db(path: str | Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(str(path))
+def init_db(path: str | Path, *, migrate: bool = False) -> sqlite3.Connection:
+    conn = sqlite3.connect(str(path), factory=foundation.Connection, timeout=30)
     conn.row_factory = sqlite3.Row
+    version = foundation.schema_version(conn)
+    existing = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name IN ('cookies','sources')").fetchone()
+    if version not in (0, foundation.SCHEMA_VERSION) or (existing and not version and not migrate):
+        conn.close()
+        raise foundation.SchemaError("explicit structural migration required; refusing an unsupported schema")
+    conn._migrating = True
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(_SCHEMA)
     # ── Lightweight migrations for pre-existing DBs ────────────────────
     # CREATE TABLE IF NOT EXISTS won't add columns to an existing table.
-    # Add admitted_at if missing, and backfill from created_at.
+    # Older shapes may lack admitted_at. Keep unknown history unknown.
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(cookies)")}
     if "admitted_at" not in cols:
         conn.execute("ALTER TABLE cookies ADD COLUMN admitted_at TEXT")
-        conn.execute("UPDATE cookies SET admitted_at = created_at WHERE admitted_at IS NULL")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_cookies_admitted_at ON cookies (admitted_at)")
     conn.commit()
+    conn._migrating = False
+    foundation.migrate(conn)
+    foundation.validate_contract(conn)
     return conn
 
 
@@ -185,7 +196,9 @@ def _load_refs(raw: str) -> list[FolioRef]:
 # ── sources ──────────────────────────────────────────────────────────
 
 
+@foundation.atomic
 def upsert_source(conn: sqlite3.Connection, source: Source) -> None:
+    conn._provenance[source.id] = source.input_provenance
     conn.execute(
         """
         INSERT INTO sources (id, source_url, zeeker_url, title, raw_text, date,
@@ -252,8 +265,10 @@ def get_source(conn: sqlite3.Connection, source_id: str) -> Source | None:
 # ── cookies ──────────────────────────────────────────────────────────
 
 
+@foundation.atomic
 def save_cookie(conn: sqlite3.Connection, cookie: Cookie, *, commit: bool = True) -> None:
     """Write the cookie row plus its cookie_sources links."""
+    foundation.check_revision(conn, cookie.id, cookie.revision)
     # admitted_at defaults to now if not set (e.g. direct test inserts).
     admitted = cookie.admitted_at or datetime.now(timezone.utc)
     conn.execute(
@@ -292,7 +307,6 @@ def save_cookie(conn: sqlite3.Connection, cookie: Cookie, *, commit: bool = True
             admitted.isoformat(),
         ),
     )
-    conn.execute("DELETE FROM cookie_sources WHERE cookie_id = ?", (cookie.id,))
     conn.executemany(
         "INSERT OR IGNORE INTO cookie_sources (cookie_id, source_id) VALUES (?, ?)",
         [(cookie.id, sid) for sid in cookie.source_ids],
@@ -301,6 +315,7 @@ def save_cookie(conn: sqlite3.Connection, cookie: Cookie, *, commit: bool = True
         conn.commit()
 
 
+@foundation.atomic
 def link_cookie_source(conn: sqlite3.Connection, cookie_id: str, source_id: str) -> None:
     """Add a corroborating source to an existing cookie (PRD section 2.1)."""
     conn.execute(
@@ -317,6 +332,7 @@ def link_cookie_source(conn: sqlite3.Connection, cookie_id: str, source_id: str)
 # auto-approve.  The live site (sitegen) reads only from `cookies`.
 
 
+@foundation.atomic
 def save_pending_cookie(
     conn: sqlite3.Connection,
     cookie: Cookie,
@@ -394,6 +410,7 @@ def get_pending_cookie(conn: sqlite3.Connection, cookie_id: str) -> sqlite3.Row 
     ).fetchone()
 
 
+@foundation.atomic
 def set_pending_discord_msg_id(
     conn: sqlite3.Connection, cookie_id: str, discord_msg_id: str
 ) -> None:
@@ -404,7 +421,8 @@ def set_pending_discord_msg_id(
     conn.commit()
 
 
-def promote_pending_cookie(conn: sqlite3.Connection, cookie_id: str) -> Cookie | None:
+@foundation.atomic
+def promote_pending_cookie(conn: sqlite3.Connection, cookie_id: str, *, expected_fingerprint=None) -> Cookie | None:
     """Move a pending cookie to the live cookies table.
 
     Copies all cookie fields, creates cookie_sources links, and deletes
@@ -414,6 +432,7 @@ def promote_pending_cookie(conn: sqlite3.Connection, cookie_id: str) -> Cookie |
     row = get_pending_cookie(conn, cookie_id)
     if row is None:
         return None
+    _check_pending(row, expected_fingerprint)
 
     # Check if already in live cookies (idempotent — avoid double insert)
     existing = conn.execute(
@@ -476,12 +495,14 @@ def promote_pending_cookie(conn: sqlite3.Connection, cookie_id: str) -> Cookie |
     return cookie
 
 
+@foundation.atomic
 def reject_pending_cookie(
     conn: sqlite3.Connection,
     cookie_id: str,
     reason: str,
     rejected_by: str | None = None,
     max_rejects: int = 2,
+    *, expected_fingerprint=None,
 ) -> str:
     """Reject a pending cookie.  Returns the new review_status.
 
@@ -496,6 +517,7 @@ def reject_pending_cookie(
     row = get_pending_cookie(conn, cookie_id)
     if row is None:
         raise KeyError(f"no pending cookie with id {cookie_id!r}")
+    _check_pending(row, expected_fingerprint)
 
     new_count = row["reject_count"] + 1
     now = datetime.now(timezone.utc).isoformat()
@@ -552,14 +574,20 @@ def reject_pending_cookie(
     return "regenerating"
 
 
+@foundation.atomic
 def update_pending_cookie_text(
     conn: sqlite3.Connection,
     cookie_id: str,
     headline: str | None = None,
     summary: str | None = None,
     why_it_matters: str | None = None,
+    *, expected_fingerprint=None,
 ) -> None:
     """Update editable text fields on a pending cookie (from the Edit button)."""
+    row = get_pending_cookie(conn, cookie_id)
+    if row is None:
+        raise foundation.StaleRevisionError("draft is no longer pending")
+    _check_pending(row, expected_fingerprint)
     updates: list[str] = []
     params: list = []
     if headline is not None:
@@ -599,6 +627,7 @@ def list_auto_approvable(
     ).fetchall()
 
 
+@foundation.atomic
 def auto_approve_pending(
     conn: sqlite3.Connection, max_age_hours: int = 72, *, exclude_news: bool = False
 ) -> list[str]:
@@ -709,6 +738,7 @@ def _row_to_cookie(conn: sqlite3.Connection, row: sqlite3.Row) -> Cookie:
         duplicate_of=row["duplicate_of"],
         created_at=datetime.fromisoformat(row["created_at"]),
         admitted_at=datetime.fromisoformat(row["admitted_at"]) if row["admitted_at"] else None,
+        revision=foundation.revision(conn, row["id"]),
     )
 
 
@@ -723,15 +753,16 @@ def all_cookies(conn: sqlite3.Connection) -> list[Cookie]:
     return [_row_to_cookie(conn, row) for row in rows]
 
 
+@foundation.atomic
 def update_cookie_areas(
     conn: sqlite3.Connection, cookie_id: str, folio_areas: list[FolioRef]
 ) -> None:
     """Replace just a cookie's folio_areas, leaving every other field intact."""
-    conn.execute(
-        "UPDATE cookies SET folio_areas = ? WHERE id = ?",
-        (_dump_refs(folio_areas), cookie_id),
-    )
-    conn.commit()
+    cookie = get_cookie(conn, cookie_id)
+    if cookie is None:
+        raise KeyError(cookie_id)
+    cookie.folio_areas = folio_areas
+    save_cookie(conn, cookie)
 
 
 def find_recent_cookies(
@@ -750,6 +781,7 @@ def find_recent_cookies(
 # ── source registry / watermarks ─────────────────────────────────────
 
 
+@foundation.atomic
 def upsert_registry_entry(conn: sqlite3.Connection, entry: SourceRegistryEntry) -> None:
     conn.execute(
         """
@@ -802,6 +834,7 @@ def get_watermark(conn: sqlite3.Connection, zeeker_db: str, table: str) -> str |
     return row["watermark"] if row else None
 
 
+@foundation.atomic
 def set_watermark(
     conn: sqlite3.Connection, zeeker_db: str, table: str, watermark: str
 ) -> None:
@@ -817,6 +850,7 @@ def set_watermark(
 # ── unresolved terms ─────────────────────────────────────────────────
 
 
+@foundation.atomic
 def record_unresolved_terms(
     conn: sqlite3.Connection, terms: list[str], seen: date | None = None
 ) -> None:
@@ -845,6 +879,7 @@ def list_unresolved_terms(conn: sqlite3.Connection) -> list[tuple[str, date, int
 # ── daily stats ──────────────────────────────────────────────────────
 
 
+@foundation.atomic
 def save_daily_stats(conn: sqlite3.Connection, stats: DailyStats) -> None:
     conn.execute(
         """
@@ -1063,6 +1098,7 @@ def _normalise_citation(citation: str) -> str:
     return " ".join(citation.split()).lower()
 
 
+@foundation.atomic
 def save_judgment_meta(
     conn: sqlite3.Connection, source_id: str, meta: JudgmentMeta
 ) -> None:
@@ -1142,3 +1178,39 @@ def list_judgment_citations(conn: sqlite3.Connection) -> dict[str, str]:
         )
         if _normalise_citation(row["citation"])
     }
+
+
+@foundation.atomic
+def record_processing(conn, source_id, pipeline, extractor_version, output_ids):
+    foundation.record_processing(conn, source_id, pipeline, extractor_version, output_ids)
+
+
+@foundation.atomic
+def queue_pending_regeneration(conn, cookie_id, feedback, *, expected_fingerprint=None):
+    row = get_pending_cookie(conn, cookie_id)
+    if row is None or row["review_status"] not in ("pending", "regenerating"):
+        raise foundation.StaleRevisionError("pending draft no longer available")
+    if expected_fingerprint is not None and pending_fingerprint(row) != expected_fingerprint:
+        raise foundation.StaleRevisionError("draft changed; reload before regenerating")
+    conn.execute("UPDATE pending_cookies SET review_status='regenerating', reject_reason=?, discord_msg_id=NULL WHERE id=?", (feedback, cookie_id))
+
+
+def pending_fingerprint(row):
+    import base64
+    import hashlib
+    # Posting a message ID is bookkeeping, not a change to reviewed content.
+    payload = {k: v for k, v in dict(row).items() if k != "discord_msg_id"}
+    return base64.urlsafe_b64encode(hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).digest()).decode().rstrip("=")
+
+
+def _check_pending(row, expected):
+    if expected is not None and pending_fingerprint(row) != expected:
+        raise foundation.StaleRevisionError("draft changed; reopen the review before saving")
+
+
+@foundation.atomic
+def finish_regeneration(conn, cookie_id, *, expected_fingerprint):
+    row = get_pending_cookie(conn, cookie_id)
+    if row is None or row["review_status"] != "regenerating" or pending_fingerprint(row) != expected_fingerprint:
+        raise foundation.StaleRevisionError("draft changed during regeneration")
+    conn.execute("DELETE FROM pending_cookies WHERE id=?", (cookie_id,))

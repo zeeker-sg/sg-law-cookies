@@ -346,7 +346,30 @@ class ZeekerClient:
             if row_id is not None
             else f"{self.base_url}/{db}/{table}"
         )
+        if table == "headlines":
+            selected = "text" if row.get("text") else "summary"
+        elif table == "commentaries":
+            selected = "full_text" if row.get("full_text") else "description"
+        elif table == "judgments":
+            selected = extras["text_source"]
+        elif table == "enforcement_decisions":
+            selected = "summary"
+        else:
+            selected = "content_text" if row.get("content_text") else "summary"
+        kind = {"text": "full_text", "full_text": "full_text", "content_text": "full_text",
+                "court_summary": "court_summary", "description": "rss_abstract",
+                "summary": "generated_summary"}.get(selected)
+        if table == "enforcement_decisions":
+            kind = "publisher_summary"  # PDPC page abstract, not an AI-generated summary.
+        provenance = {
+            "input_kind": kind, "selected_field": selected,
+            "input_projection": "datasette_default_json",
+            "date_basis": "document" if _parse_date(raw_date) else "discovery_fallback",
+            "upstream_discovered_at": str(row[timestamp_column(db, table)]) if row.get(timestamp_column(db, table)) is not None else None,
+            "upstream_enriched_at": str(row["extracted_at"]) if row.get("extracted_at") is not None else None,
+        }
         return RawItem(
+            input_provenance=provenance,
             source_url=source_url,
             zeeker_url=zeeker_url,
             title=title,

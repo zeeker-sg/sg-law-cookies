@@ -180,12 +180,13 @@ uv run cookies restore
 # Re-apply preserved discord_msg_id mappings after restore.
 if [[ -n "$DISCORD_MSG_MAP" && -f "$DISCORD_MSG_MAP" ]]; then
     uv run python - "$DISCORD_MSG_MAP" <<'PYMSG'
-import json, sqlite3, sys, os
+import json, sys, os
+from sg_law_cookies import db
 map_file = sys.argv[1]
 db_path = os.environ.get("COOKIES_DB_PATH", "./cookies.db")
 with open(map_file) as f:
     rows = json.load(f)
-conn = sqlite3.connect(db_path)
+conn = db.init_db(db_path)
 applied = 0
 for row in rows:
     cur = conn.execute(

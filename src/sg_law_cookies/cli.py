@@ -253,6 +253,14 @@ def _cmd_build(args: argparse.Namespace, settings: Settings) -> int:
     return 0
 
 
+def _cmd_migrate_schema(args: argparse.Namespace, settings: Settings) -> int:
+    from sg_law_cookies.migration import migrate_copy
+    import json
+    report = migrate_copy(Path(args.source), Path(args.out))
+    print(json.dumps(report, indent=2))
+    return 0
+
+
 def _cmd_restore(args: argparse.Namespace, settings: Settings) -> int:
     from sg_law_cookies.backup import BackupError, restore_db
 
@@ -262,7 +270,7 @@ def _cmd_restore(args: argparse.Namespace, settings: Settings) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(
-        f"restored s3://{result.bucket}/{result.key} "
+        f"{'already matches' if result.unchanged else 'restored'} s3://{result.bucket}/{result.key} "
         f"({result.size_bytes:,} bytes) -> {result.db_path}"
     )
     return 0
@@ -318,6 +326,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     init_p = sub.add_parser("init-db", help="create the SQLite database")
     init_p.set_defaults(func=_cmd_init_db)
+
+    migration_p = sub.add_parser("migrate-schema", help="Structural migration to a new private copy; never replaces a live DB")
+    migration_p.add_argument("--source", required=True)
+    migration_p.add_argument("--out", required=True)
+    migration_p.set_defaults(func=_cmd_migrate_schema)
+
 
     discover_p = sub.add_parser(
         "discover", help="diff the Zeeker catalogue against the source registry"

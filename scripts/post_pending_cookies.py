@@ -148,8 +148,9 @@ def build_embed(row) -> dict:
     return embed
 
 
-def build_components(cookie_id: str) -> list[dict]:
+def build_components(cookie_id: str, fingerprint: str | None = None) -> list[dict]:
     """Build the Approve / Reject / Edit button row."""
+    cookie_id = cookie_id + (":" + fingerprint if fingerprint else "")
     return [
         {
             "type": 1,  # ACTION_ROW
@@ -213,7 +214,7 @@ def main() -> int:
     posted = 0
     for row in pending:
         embed = build_embed(row)
-        components = build_components(row["id"])
+        components = build_components(row["id"], cookies_db.pending_fingerprint(row))
         body = {
             "embeds": [embed],
             "components": components,

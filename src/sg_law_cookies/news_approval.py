@@ -25,9 +25,11 @@ class NewsApprovalError(ValueError):
 def open_news_db(path: Path, *, writable: bool = False) -> sqlite3.Connection:
     mode = "rw" if writable else "ro"  # Never create/initialise a live database.
     conn = sqlite3.connect(path.resolve().as_uri() + "?mode=" + mode,
-                           uri=True, timeout=30)
+                           uri=True, timeout=30, factory=db.foundation.Connection)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
+    if writable:
+        db.foundation.require_schema(conn)
     if not writable:
         conn.execute("PRAGMA query_only=ON")
     return conn
@@ -181,20 +183,21 @@ def apply_pending_news(path: Path, backup: Path, expected: dict) -> dict:
             raise NewsApprovalError("database replaced; retry with cookie cycle idle")
         # Keep canonical pending originals before their duplicate children.
         ordered = [c for c in plan.cookies if c.id in wanted]
-        for cookie in ordered:
-            db.save_cookie(conn, cookie, commit=False)
-            if cookie.duplicate_of:
-                conn.executemany("INSERT OR IGNORE INTO cookie_sources(cookie_id,source_id) "
-                                 "VALUES (?,?)",
-                                 [(cookie.duplicate_of, sid) for sid in cookie.source_ids])
-            # Preserve deferred corroboration from earlier auto-admitted news
-            # whose canonical source was still in the review queue.
-            conn.execute("INSERT OR IGNORE INTO cookie_sources(cookie_id,source_id) "
-                         "SELECT ?,cs.source_id FROM cookie_sources cs JOIN cookies c "
-                         "ON c.id=cs.cookie_id WHERE c.duplicate_of=?",
-                         (cookie.id, cookie.id))
-            conn.execute("DELETE FROM pending_cookies WHERE id=? AND item_type='news' "
-                         "AND review_status='pending' AND reject_count=0", (cookie.id,))
+        with db.write_transaction(conn):
+            for cookie in ordered:
+                db.save_cookie(conn, cookie, commit=False)
+                if cookie.duplicate_of:
+                    conn.executemany("INSERT OR IGNORE INTO cookie_sources(cookie_id,source_id) "
+                                     "VALUES (?,?)",
+                                     [(cookie.duplicate_of, sid) for sid in cookie.source_ids])
+                # Preserve deferred corroboration from earlier auto-admitted news
+                # whose canonical source was still in the review queue.
+                conn.execute("INSERT OR IGNORE INTO cookie_sources(cookie_id,source_id) "
+                             "SELECT ?,cs.source_id FROM cookie_sources cs JOIN cookies c "
+                             "ON c.id=cs.cookie_id WHERE c.duplicate_of=?",
+                             (cookie.id, cookie.id))
+                conn.execute("DELETE FROM pending_cookies WHERE id=? AND item_type='news' "
+                             "AND review_status='pending' AND reject_count=0", (cookie.id,))
         if _file_identity(path) != identity:
             raise NewsApprovalError("database replaced; retry with cookie cycle idle")
         conn.commit()

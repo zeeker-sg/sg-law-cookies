@@ -577,6 +577,7 @@ def process_judgment(
         item_type=raw_item.item_type,
         license=raw_item.license,
         token_count=token_count,
+        input_provenance=raw_item.input_provenance,
     )
     meta = _build_meta(source.id, structure)
     resolve_judgment_meta(folio_client, meta)
@@ -586,34 +587,36 @@ def process_judgment(
         case.internal_ref = known_citations.get(" ".join(case.citation.split()).lower())
 
     # ── Step 6: store ─────────────────────────────────────────────────
-    db.upsert_source(conn, source)
-    db.save_judgment_meta(conn, source.id, meta)
+    with db.write_transaction(conn):
+        db.upsert_source(conn, source)
+        db.save_judgment_meta(conn, source.id, meta)
 
-    cookies: list[Cookie] = []
-    unresolved: list[str] = []
-    for topic in topics:
-        cookie = Cookie(
-            source_ids=[source.id],
-            headline=topic.headline,
-            summary=topic.summary,
-            why_it_matters=topic.why_it_matters,
-            significance=topic.significance,
-            folio_areas=topic.folio_areas,
-            folio_entities=topic.folio_entities,
-            folio_concepts=topic.folio_concepts,
-            unresolved=topic.unresolved,
-        )
-        # Human-in-the-loop: cookies go to the pending review table,
-        # not the live cookies table.  They are promoted to the live
-        # site only after Discord approval or 72h auto-approve.
-        db.save_pending_cookie(
-            conn, cookie, item_type=raw_item.item_type, source_url=raw_item.source_url
-        )
-        unresolved.extend(term for term in topic.unresolved if term not in unresolved)
-        cookies.append(cookie)
+        cookies: list[Cookie] = []
+        unresolved: list[str] = []
+        for topic in topics:
+            cookie = Cookie(
+                source_ids=[source.id],
+                headline=topic.headline,
+                summary=topic.summary,
+                why_it_matters=topic.why_it_matters,
+                significance=topic.significance,
+                folio_areas=topic.folio_areas,
+                folio_entities=topic.folio_entities,
+                folio_concepts=topic.folio_concepts,
+                unresolved=topic.unresolved,
+            )
+            # Human-in-the-loop: cookies go to the pending review table,
+            # not the live cookies table.  They are promoted to the live
+            # site only after Discord approval or 72h auto-approve.
+            db.save_pending_cookie(
+                conn, cookie, item_type=raw_item.item_type, source_url=raw_item.source_url
+            )
+            unresolved.extend(term for term in topic.unresolved if term not in unresolved)
+            cookies.append(cookie)
 
-    unresolved.extend(t for t in _meta_unresolved(meta) if t not in unresolved)
-    if unresolved:
-        db.record_unresolved_terms(conn, unresolved)
+        unresolved.extend(t for t in _meta_unresolved(meta) if t not in unresolved)
+        if unresolved:
+            db.record_unresolved_terms(conn, unresolved)
 
-    return JudgmentCookies(cookies, meta=meta, warnings=warnings)
+        db.record_processing(conn, source.id, "judgment", model, [c.id for c in cookies])
+        return JudgmentCookies(cookies, meta=meta, warnings=warnings)

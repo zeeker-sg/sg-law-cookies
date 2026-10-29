@@ -206,7 +206,7 @@ def test_init_db_migrates_existing_db_without_judgment_meta(tmp_path):
     old.commit()
     old.close()
 
-    conn = db.init_db(path)
+    conn = db.init_db(path, migrate=True)
     try:
         tables = {
             row["name"]

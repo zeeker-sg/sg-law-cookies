@@ -33,6 +33,7 @@ class RawItem(BaseModel):
     # Table-specific context (e.g. judgment citation, court, court_summary,
     # subject_tags, text_source) that downstream pipelines may use.
     extras: dict[str, str] = Field(default_factory=dict)
+    input_provenance: dict[str, str | None] = Field(default_factory=dict, exclude=True)
 
 
 class FolioRef(BaseModel):
@@ -77,6 +78,7 @@ class Source(BaseModel):
     license: str
     token_count: int
     ingested_at: datetime = Field(default_factory=_utcnow)  # when we saw it in Zeeker
+    input_provenance: dict[str, str | None] = Field(default_factory=dict, exclude=True)
 
 
 class Cookie(BaseModel):
@@ -94,6 +96,7 @@ class Cookie(BaseModel):
     duplicate_of: str | None = None
     created_at: datetime = Field(default_factory=_utcnow)  # when the LLM produced it
     admitted_at: datetime | None = None  # when it entered the live DB (approval date)
+    revision: int = Field(default=0, exclude=True)  # optimistic writer token, not a public field
 
 
 class JudgmentIssue(BaseModel):

@@ -35,6 +35,7 @@ class RestoreResult:
     key: str
     db_path: Path
     size_bytes: int
+    unchanged: bool = False
 
 
 def _make_client():
@@ -70,7 +71,9 @@ def snapshot_db(db_path: Path, dest: Path) -> None:
     Safe against a concurrently writing pipeline (WAL mode); a plain file
     copy is not.
     """
-    src = sqlite3.connect(db_path)
+    from sg_law_cookies.migration import readonly
+
+    src = readonly(db_path)
     try:
         dst = sqlite3.connect(dest)
         try:
@@ -101,6 +104,15 @@ def backup_db(
     with tempfile.TemporaryDirectory() as tmp:
         snap = Path(tmp) / "cookies-snapshot.db"
         snapshot_db(db_path, snap)
+        from sg_law_cookies.foundation import SchemaError, validate_contract
+        from sg_law_cookies.migration import readonly
+        reader = readonly(snap)
+        try:
+            validate_contract(reader)
+        except SchemaError as exc:
+            raise BackupError(str(exc)) from exc
+        finally:
+            reader.close()
         size = snap.stat().st_size
         client.upload_file(str(snap), bucket, dated_key)
         client.upload_file(str(snap), bucket, latest_key)
@@ -113,12 +125,12 @@ def restore_db(
     s3_client=None,
     key: str | None = None,
 ) -> RestoreResult:
-    """Download the canonical snapshot from S3 and atomically replace db_path.
+    """Download and validate the canonical snapshot; never overwrite divergent state.
 
     The mirror of backup_db: pulls backups/sg-law-cookies/latest.db so a fresh
-    or stale host continues from canonical state instead of re-forking. Stale
-    WAL sidecars are removed first — applying them to the replaced file would
-    corrupt it.
+    host can cold-start from canonical state. An identical running database is
+    left alone, including WAL sidecars. Divergence requires a writer freeze and
+    explicit offline reconciliation, not an online file replacement.
     """
     bucket = bucket or os.getenv("S3_BUCKET")
     if not bucket:
@@ -133,6 +145,14 @@ def restore_db(
         except Exception as exc:  # noqa: BLE001 — surface a clear message for any S3/botocore error
             raise BackupError(f"could not download s3://{bucket}/{key}: {exc}") from exc
         size = dl.stat().st_size
+        from sg_law_cookies.migration import validate_restore
+        from sg_law_cookies.foundation import SchemaError
+        try:
+            replace = validate_restore(dl, db_path)
+        except (SchemaError, sqlite3.Error, OSError) as exc:
+            raise BackupError(str(exc)) from exc
+        if not replace:
+            return RestoreResult(bucket=bucket, key=key, db_path=Path(db_path), size_bytes=size, unchanged=True)
         db_path = Path(db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         for sidecar in (f"{db_path}-wal", f"{db_path}-shm"):

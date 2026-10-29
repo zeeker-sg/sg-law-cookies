@@ -111,85 +111,88 @@ def process_news(
         item_type=raw_item.item_type,
         license=raw_item.license,
         token_count=_estimate_tokens(raw_item.raw_text),
+        input_provenance=raw_item.input_provenance,
     )
-    db.upsert_source(conn, source)
+    with db.write_transaction(conn):
+        db.upsert_source(conn, source)
 
-    # Dedup check: compare against recent LIVE cookies AND pending
-    # cookies (both are potential duplicates — pending cookies haven't
-    # been promoted yet but should still be deduped against).
-    recent = [
-        cookie
-        for cookie in db.find_recent_cookies(conn, DEDUP_LOOKBACK_DAYS)
-        if not cookie.is_duplicate
-    ]
-    # Also check pending_cookies for headlines within the lookback window.
-    for row in db.list_pending_cookies(conn, status="pending"):
-        pending_created = datetime.fromisoformat(row["created_at"])
-        cutoff = datetime.now(timezone.utc) - timedelta(days=DEDUP_LOOKBACK_DAYS)
-        if pending_created >= cutoff:
-            recent.append(
-                Cookie(
-                    id=row["id"],
-                    source_ids=_json.loads(row["source_ids"]),
-                    headline=row["headline"],
-                    summary=row["summary"],
-                    why_it_matters=row["why_it_matters"],
-                    significance=row["significance"],
-                    folio_areas=db._load_refs(row["folio_areas"]),
-                    folio_entities=db._load_refs(row["folio_entities"]),
-                    folio_concepts=db._load_refs(row["folio_concepts"]),
-                    unresolved=_json.loads(row["unresolved"]),
-                    created_at=pending_created,
+        # Dedup check: compare against recent LIVE cookies AND pending
+        # cookies (both are potential duplicates — pending cookies haven't
+        # been promoted yet but should still be deduped against).
+        recent = [
+            cookie
+            for cookie in db.find_recent_cookies(conn, DEDUP_LOOKBACK_DAYS)
+            if not cookie.is_duplicate
+        ]
+        # Also check pending_cookies for headlines within the lookback window.
+        for row in db.list_pending_cookies(conn, status="pending"):
+            pending_created = datetime.fromisoformat(row["created_at"])
+            cutoff = datetime.now(timezone.utc) - timedelta(days=DEDUP_LOOKBACK_DAYS)
+            if pending_created >= cutoff:
+                recent.append(
+                    Cookie(
+                        id=row["id"],
+                        source_ids=_json.loads(row["source_ids"]),
+                        headline=row["headline"],
+                        summary=row["summary"],
+                        why_it_matters=row["why_it_matters"],
+                        significance=row["significance"],
+                        folio_areas=db._load_refs(row["folio_areas"]),
+                        folio_entities=db._load_refs(row["folio_entities"]),
+                        folio_concepts=db._load_refs(row["folio_concepts"]),
+                        unresolved=_json.loads(row["unresolved"]),
+                        created_at=pending_created,
+                    )
                 )
+        cookies: list[Cookie] = []
+        unresolved: list[str] = []
+        for topic in topics:
+            original = _find_duplicate(topic, recent)
+            cookie = Cookie(
+                source_ids=[source.id],
+                headline=topic.headline,
+                summary=topic.summary,
+                why_it_matters=topic.why_it_matters,
+                significance=topic.significance,
+                folio_areas=topic.folio_areas,
+                folio_entities=topic.folio_entities,
+                folio_concepts=topic.folio_concepts,
+                unresolved=topic.unresolved,
+                is_duplicate=original is not None,
+                duplicate_of=original.id if original else None,
             )
-    cookies: list[Cookie] = []
-    unresolved: list[str] = []
-    for topic in topics:
-        original = _find_duplicate(topic, recent)
-        cookie = Cookie(
-            source_ids=[source.id],
-            headline=topic.headline,
-            summary=topic.summary,
-            why_it_matters=topic.why_it_matters,
-            significance=topic.significance,
-            folio_areas=topic.folio_areas,
-            folio_entities=topic.folio_entities,
-            folio_concepts=topic.folio_concepts,
-            unresolved=topic.unresolved,
-            is_duplicate=original is not None,
-            duplicate_of=original.id if original else None,
-        )
-        # Human-in-the-loop: cookies go to the pending review table,
-        # not the live cookies table.  They are promoted to the live
-        # site only after Discord approval or 72h auto-approve.
-        if auto_approve_news and raw_item.item_type == "news":
-            # Only newly generated, validated news enters this branch. Existing
-            # pending sources return above; rejected/regenerated drafts use their
-            # own review path. Preserve duplicate flags and source links.
-            from sg_law_cookies.news_approval import validate_news_cookie
+            # Human-in-the-loop: cookies go to the pending review table,
+            # not the live cookies table.  They are promoted to the live
+            # site only after Discord approval or 72h auto-approve.
+            if auto_approve_news and raw_item.item_type == "news":
+                # Only newly generated, validated news enters this branch. Existing
+                # pending sources return above; rejected/regenerated drafts use their
+                # own review path. Preserve duplicate flags and source links.
+                from sg_law_cookies.news_approval import validate_news_cookie
 
-            validate_news_cookie(conn, cookie)
-            db.save_cookie(conn, cookie)
-            recent.append(cookie)
-        else:
-            db.save_pending_cookie(
-                conn, cookie, item_type=raw_item.item_type, source_url=raw_item.source_url
-            )
-        if original is not None:
-            # Duplicates are flagged, not deleted; the new source corroborates
-            # the original cookie (PRD sections 2.1, 4.1 step 3).
-            # Link to the ORIGINAL live cookie if it was already promoted,
-            # otherwise skip — the duplicate will be linked on promotion.
-            try:
-                db.link_cookie_source(conn, original.id, source.id)
-            except sqlite3.IntegrityError:
-                pass  # original not yet in live cookies; skip link
-        unresolved.extend(topic.unresolved)
-        cookies.append(cookie)
+                validate_news_cookie(conn, cookie)
+                db.save_cookie(conn, cookie)
+                recent.append(cookie)
+            else:
+                db.save_pending_cookie(
+                    conn, cookie, item_type=raw_item.item_type, source_url=raw_item.source_url
+                )
+            if original is not None:
+                # Duplicates are flagged, not deleted; the new source corroborates
+                # the original cookie (PRD sections 2.1, 4.1 step 3).
+                # Link to the ORIGINAL live cookie if it was already promoted,
+                # otherwise skip — the duplicate will be linked on promotion.
+                try:
+                    db.link_cookie_source(conn, original.id, source.id)
+                except sqlite3.IntegrityError:
+                    pass  # original not yet in live cookies; skip link
+            unresolved.extend(topic.unresolved)
+            cookies.append(cookie)
 
-    if unresolved:
-        db.record_unresolved_terms(conn, unresolved)
-    return cookies
+        if unresolved:
+            db.record_unresolved_terms(conn, unresolved)
+        db.record_processing(conn, source.id, "news", model, [c.id for c in cookies])
+        return cookies
 
 
 @dataclass
