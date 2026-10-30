@@ -109,6 +109,38 @@ def make_raw_item(url: str = "https://example.org/a", **overrides) -> RawItem:
     return RawItem(**fields)
 
 
+def test_store_failure_is_atomic_and_remains_retryable(conn, monkeypatch):
+    """A partial topic batch must not freeze a Source as already processed."""
+    from sg_law_cookies import pipeline
+    from sg_law_cookies.models import TopicExtraction
+
+    class Backend:
+        def extract_topics(self, raw_item):
+            return [TopicExtraction.model_validate(topic_dict("First")),
+                    TopicExtraction.model_validate(topic_dict("Second"))]
+
+    monkeypatch.setattr(pipeline, "as_backend", lambda *a: Backend())
+    monkeypatch.setattr(pipeline, "resolve_topic", lambda *a: None)
+    real_save = db.save_pending_cookie
+    calls = 0
+
+    def fail_second(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("injected storage failure")
+        return real_save(*args, **kwargs)
+
+    monkeypatch.setattr(db, "save_pending_cookie", fail_second)
+    with pytest.raises(RuntimeError, match="injected"):
+        process_news(make_raw_item(), conn, object(), None)
+    for table in ("sources", "documents", "input_observations", "pending_cookies", "processing_receipts", "write_events"):
+        assert conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0] == 0
+    monkeypatch.setattr(db, "save_pending_cookie", real_save)
+    assert len(process_news(make_raw_item(), conn, object(), None)) == 2
+    assert conn.execute("SELECT count(*) FROM processing_receipts").fetchone()[0] == 1
+
+
 def mock_folio() -> None:
     respx.get(f"{FOLIO_API_BASE}/search/query").respond(
         json={

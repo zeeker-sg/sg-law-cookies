@@ -244,6 +244,7 @@ def export_public_db(
     *,
     upload: bool = False,
     bucket: str | None = None,
+    now: datetime | None = None,
 ) -> ExportResult:
     """Snapshot the production DB and derive the public export at out_path.
 
@@ -255,6 +256,7 @@ def export_public_db(
     """
     src = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
+        src.execute("BEGIN")  # All public tables derive from one consistent read snapshot.
         rows = _cookie_rows(src)
         meta_rows = src.execute(
             """
@@ -401,7 +403,7 @@ def export_public_db(
             "INSERT INTO unresolved_terms VALUES (?,?,?,?)",
             [(u["id"], u["term"], u["first_seen_date"], u["count"]) for u in unresolved_rows],
         )
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        stamp = (now or datetime.now(timezone.utc)).strftime("%Y%m%d_%H%M%S")
         started = datetime.now(timezone.utc)
         con.executemany(
             "INSERT INTO _zeeker_updates VALUES (?,?,?,?,?)",

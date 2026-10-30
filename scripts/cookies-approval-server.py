@@ -291,12 +291,20 @@ def _resp(body: dict, status: int = 200) -> tuple[bytes, int]:
 
 def _modal_response(cookie_id: str, action: str) -> dict:
     """Build a modal interaction response for reject or edit."""
+    conn, cookies_db = get_db_conn()
+    try:
+        row = cookies_db.get_pending_cookie(conn, cookie_id)
+        if row is None:
+            return {"type": 4, "data": {"content": "Draft is no longer pending.", "flags": 64}}
+        fingerprint = cookies_db.pending_fingerprint(row)
+    finally:
+        conn.close()
     if action == "reject":
         return {
             "type": 9,  # MODAL
             "data": {
                 "title": "Reject cookie",
-                "custom_id": f"reject_modal:{cookie_id}",
+                "custom_id": f"reject_modal:{cookie_id}:{fingerprint}",
                 "components": [
                     {
                         "type": 1,
@@ -332,7 +340,7 @@ def _modal_response(cookie_id: str, action: str) -> dict:
             "type": 9,  # MODAL
             "data": {
                 "title": "Edit cookie",
-                "custom_id": f"edit_modal:{cookie_id}",
+                "custom_id": f"edit_modal:{cookie_id}:{fingerprint}",
                 "components": [
                     {
                         "type": 1,
@@ -392,9 +400,10 @@ def handle_button_click(
     """
     data = interaction.get("data", {})
     custom_id = data.get("custom_id", "")
-    parts = custom_id.split(":", 1)
+    parts = custom_id.split(":", 2)
     action = parts[0]
     cookie_id = parts[1] if len(parts) > 1 else ""
+    expected_fingerprint = parts[2] if len(parts) > 2 else None
 
     # Get the original message ID + channel ID for editing.
     msg_id = interaction.get("message", {}).get("id")
@@ -405,7 +414,25 @@ def handle_button_click(
     if action == "approve":
         conn, cookies_db = get_db_conn()
         try:
-            cookie = cookies_db.promote_pending_cookie(conn, cookie_id)
+            row = cookies_db.get_pending_cookie(conn, cookie_id)
+            if row is not None and expected_fingerprint is None:
+                # Old cards keep their IDs. Verify their visible prose before
+                # approving; stale cards cannot approve unseen edited content.
+                embeds = interaction.get("message", {}).get("embeds", [])
+                shown = {f.get("name"): f.get("value") for e in embeds for f in e.get("fields", [])}
+                title = f"{ITEM_TYPE_EMOJI.get(row['item_type'], '📄')} {row['headline']}"
+                if len(title.encode("utf-16-le")) // 2 > 256:
+                    units = 0
+                    for index, character in enumerate(title):
+                        weight = 2 if ord(character) > 0xFFFF else 1
+                        if units + weight > 255:
+                            title = title[:index] + "…"
+                            break
+                        units += weight
+                if not embeds or embeds[0].get("title") != title or shown.get("Summary") != row["summary"] or shown.get("Why it matters") != row["why_it_matters"]:
+                    raise cookies_db.foundation.StaleRevisionError("review card changed; refresh it before approval")
+                expected_fingerprint = cookies_db.pending_fingerprint(row)
+            cookie = cookies_db.promote_pending_cookie(conn, cookie_id, expected_fingerprint=expected_fingerprint)
             if cookie is None:
                 return _resp({
                     "type": 4,
@@ -457,9 +484,13 @@ def handle_modal_submit(
     """
     data = interaction.get("data", {})
     custom_id = data.get("custom_id", "")
-    parts = custom_id.split(":", 1)
+    parts = custom_id.split(":", 2)
     action = parts[0]
     cookie_id = parts[1] if len(parts) > 1 else ""
+    expected_fingerprint = parts[2] if len(parts) > 2 else None
+
+    if expected_fingerprint is None:
+        return _resp({"type": 4, "data": {"content": "Please reopen the review; this older modal has no revision token.", "flags": 64}})
 
     # Get the original message ID + channel ID for editing.
     # For MODAL_SUBMIT, the message field contains the message that
@@ -479,7 +510,7 @@ def handle_modal_submit(
         conn, cookies_db = get_db_conn()
         try:
             status = cookies_db.reject_pending_cookie(
-                conn, cookie_id, reason, rejected_by=user_id
+                conn, cookie_id, reason, rejected_by=user_id, expected_fingerprint=expected_fingerprint
             )
             # Edit the original Discord message.
             if msg_id and channel_id and token:
@@ -531,6 +562,7 @@ def handle_modal_submit(
                 headline=headline or None,
                 summary=summary or None,
                 why_it_matters=why_it_matters or None,
+                expected_fingerprint=expected_fingerprint,
             )
             # Edit the original Discord message to show edited status.
             if msg_id and channel_id and token:

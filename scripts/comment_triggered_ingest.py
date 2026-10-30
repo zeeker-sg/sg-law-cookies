@@ -337,17 +337,8 @@ def process_cookie_thread(
 
     # Mark the cookie as regenerating with the comment as feedback.
     try:
-        conn.execute(
-            """
-            UPDATE pending_cookies
-            SET review_status = 'regenerating',
-                reject_reason = ?,
-                discord_msg_id = NULL
-            WHERE id = ?
-            """,
-            (full_feedback, row["id"]),
-        )
-        conn.commit()
+        cookies_db.queue_pending_regeneration(conn, row["id"], full_feedback,
+                                      expected_fingerprint=cookies_db.pending_fingerprint(row))
     except Exception as exc:
         print(f"  ERROR updating cookie {cookie_id}: {exc}", file=sys.stderr)
         return 0
@@ -459,17 +450,8 @@ def process_channel(
         # We don't increment reject_count — comment-triggered regeneration
         # is a fresh cycle, not a rejection.
         try:
-            conn.execute(
-                """
-                UPDATE pending_cookies
-                SET review_status = 'regenerating',
-                    reject_reason = ?,
-                    discord_msg_id = NULL
-                WHERE id = ?
-                """,
-                (full_feedback, row["id"]),
-            )
-            conn.commit()
+            cookies_db.queue_pending_regeneration(conn, row["id"], full_feedback,
+                                          expected_fingerprint=cookies_db.pending_fingerprint(row))
         except Exception as exc:
             print(f"  ERROR updating cookie {cookie_prefix}: {exc}", file=sys.stderr)
             continue

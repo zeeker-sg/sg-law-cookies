@@ -149,33 +149,35 @@ def main() -> int:
                 for topic in topics:
                     resolve_topic(topic, folio_client)
 
-            # Write regenerated cookies back to pending
-            for topic in topics:
-                new_cookie = Cookie(
-                    source_ids=source_ids,
-                    headline=topic.headline,
-                    summary=topic.summary,
-                    why_it_matters=topic.why_it_matters,
-                    significance=topic.significance,
-                    folio_areas=topic.folio_areas,
-                    folio_entities=topic.folio_entities,
-                    folio_concepts=topic.folio_concepts,
-                    unresolved=topic.unresolved,
-                )
-                # Save with a new ID (the old one was discarded)
-                db.save_pending_cookie(
-                    conn, new_cookie,
-                    item_type=item_type,
-                    source_url=source.source_url,
-                )
-                regenerated += 1
-                print(f"  regenerated: {new_cookie.headline[:60]}")
+            with db.write_transaction(conn):
+                # Write regenerated cookies back to pending
+                new_cookies = []
+                for topic in topics:
+                    new_cookie = Cookie(
+                        source_ids=source_ids,
+                        headline=topic.headline,
+                        summary=topic.summary,
+                        why_it_matters=topic.why_it_matters,
+                        significance=topic.significance,
+                        folio_areas=topic.folio_areas,
+                        folio_entities=topic.folio_entities,
+                        folio_concepts=topic.folio_concepts,
+                        unresolved=topic.unresolved,
+                    )
+                    # Save with a new ID (the old one was discarded)
+                    db.save_pending_cookie(
+                        conn, new_cookie,
+                        item_type=item_type,
+                        source_url=source.source_url,
+                    )
+                    new_cookies.append(new_cookie)
 
-            # Delete the old regenerating row
-            conn.execute(
-                "DELETE FROM pending_cookies WHERE id = ?", (cookie_id,)
-            )
-            conn.commit()
+                # Delete the old regenerating row
+                db.finish_regeneration(conn, cookie_id, expected_fingerprint=db.pending_fingerprint(row))
+                db.record_processing(conn, source.id, "regeneration", settings.ollama_model if settings.llm_backend == "ollama" else settings.model, [c.id for c in new_cookies])
+            regenerated += len(new_cookies)
+            for new_cookie in new_cookies:
+                print(f"  regenerated: {new_cookie.headline[:60]}")
 
         except Exception as exc:
             print(f"  FAILED {cookie_id[:8]}: {exc}", file=sys.stderr)
