@@ -185,7 +185,10 @@ def apply_pending_news(path: Path, backup: Path, expected: dict) -> dict:
         ordered = [c for c in plan.cookies if c.id in wanted]
         with db.write_transaction(conn):
             for cookie in ordered:
-                db.save_cookie(conn, cookie, commit=False)
+                db.save_cookie(
+                    conn, cookie, commit=False,
+                    approval_method=db.APPROVAL_METHOD_NEWS_BACKLOG,
+                )
                 if cookie.duplicate_of:
                     conn.executemany("INSERT OR IGNORE INTO cookie_sources(cookie_id,source_id) "
                                      "VALUES (?,?)",

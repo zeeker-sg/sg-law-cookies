@@ -432,7 +432,15 @@ def handle_button_click(
                 if not embeds or embeds[0].get("title") != title or shown.get("Summary") != row["summary"] or shown.get("Why it matters") != row["why_it_matters"]:
                     raise cookies_db.foundation.StaleRevisionError("review card changed; refresh it before approval")
                 expected_fingerprint = cookies_db.pending_fingerprint(row)
-            cookie = cookies_db.promote_pending_cookie(conn, cookie_id, expected_fingerprint=expected_fingerprint)
+            cookie = cookies_db.promote_pending_cookie(
+                conn, cookie_id,
+                expected_fingerprint=expected_fingerprint,
+                approval_method=cookies_db.APPROVAL_METHOD_DISCORD,
+                # Discord user ID of the reviewer, like rejected_by stores
+                # for rejections.  No member identity in the interaction
+                # (or the "unknown" fallback) stays NULL — never invented.
+                approved_by=user_id if user_id and user_id != "unknown" else None,
+            )
             if cookie is None:
                 return _resp({
                     "type": 4,

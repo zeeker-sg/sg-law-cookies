@@ -193,7 +193,8 @@ def test_duplicate_of_pending_judgment_stays_in_review(database):
 def test_existing_live_duplicate_is_not_published_twice(database, tmp_path):
     path, conn = database
     original = draft(conn)
-    db.promote_pending_cookie(conn, original.id)
+    db.promote_pending_cookie(conn, original.id, approval_method=db.APPROVAL_METHOD_DISCORD,
+                              approved_by="reviewer-1")
     duplicate = draft(conn)
     apply_pending_news(path, tmp_path / "before.db", plan(conn))
     assert db.get_cookie(conn, duplicate.id).is_duplicate

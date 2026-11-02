@@ -9,7 +9,8 @@ import pytest
 
 from sg_law_cookies import db, foundation
 from sg_law_cookies.migration import (
-    digest, manifest, migrate_copy, prepare_rollback, snapshot, validate_restore,
+    ADDITIVE_LEGACY_COLUMNS, digest, manifest, migrate_copy, prepare_rollback,
+    snapshot, validate_restore,
 )
 from sg_law_cookies.models import Cookie, Source
 
@@ -61,11 +62,13 @@ def legacy(tmp_path):
 
 def test_migration_is_mechanical_complete_and_repeatable(legacy, tmp_path):
     target = tmp_path / "migrated.db"
-    before = manifest(legacy)
+    before = manifest(legacy, drop_columns=ADDITIVE_LEGACY_COLUMNS)
     report = migrate_copy(legacy, target)
     assert report["legacy_equivalent"] and report["repeat_migration_noop"]
-    assert manifest(target, legacy_only=True) == before
+    assert manifest(target, legacy_only=True, drop_columns=ADDITIVE_LEGACY_COLUMNS) == before
+    # The additive approval-provenance columns arrive with honest defaults.
     conn = db.init_db(target)
+    assert tuple(conn.execute("SELECT approval_method, approved_by, approved_at FROM cookies WHERE id='c1'").fetchone()) == ("unknown", None, None)
     assert conn.execute("SELECT count(*) FROM stories").fetchone()[0] == 1
     assert conn.execute("SELECT count(*) FROM insights").fetchone()[0] == 1
     assert conn.execute("SELECT count(*) FROM documents").fetchone()[0] == 1
@@ -130,7 +133,7 @@ def test_copy_migration_cli_uses_explicit_paths(legacy, tmp_path, monkeypatch, c
     assert cli.main(["migrate-schema", "--source", str(legacy), "--out", str(output)]) == 0
     assert json.loads(capsys.readouterr().out)["legacy_equivalent"]
     assert digest(legacy) == before
-    assert manifest(output, legacy_only=True) == manifest(legacy)
+    assert manifest(output, legacy_only=True, drop_columns=ADDITIVE_LEGACY_COLUMNS) == manifest(legacy, legacy_only=True, drop_columns=ADDITIVE_LEGACY_COLUMNS)
 
 
 def test_enrichment_retains_original_observation_and_evidence(live):
@@ -263,7 +266,9 @@ def test_approval_preserves_identity_and_rejection_history(live):
     draft = cookie(src)
     db.save_pending_cookie(conn, draft, "judgment")
     row = db.get_pending_cookie(conn, draft.id)
-    promoted = db.promote_pending_cookie(conn, draft.id, expected_fingerprint=db.pending_fingerprint(row))
+    promoted = db.promote_pending_cookie(conn, draft.id, expected_fingerprint=db.pending_fingerprint(row),
+                                         approval_method=db.APPROVAL_METHOD_DISCORD, approved_by="reviewer-1")
+    assert promoted is not None
     assert promoted.id == draft.id
     assert db.get_pending_cookie(conn, draft.id) is None
     assert foundation.revision(conn, draft.id) == 1

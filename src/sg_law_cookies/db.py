@@ -19,6 +19,36 @@ from sg_law_cookies.models import (
     SourceRegistryEntry,
 )
 
+# ── approval provenance: how each live cookie was admitted ───────────
+#
+# Fixed vocabulary, one value per path into the live `cookies` table:
+#   discord_approval — a person clicked Approve on the review embed
+#                      (scripts/cookies-approval-server.py); approved_by
+#                      holds that reviewer's Discord user ID, approved_at
+#                      the time of the approval.
+#   sweep_72h        — the 72-hour pending age sweep (auto_approve_pending).
+#   news_auto        — immediate validated admission of newly generated
+#                      news in the pipeline (COOKIES_AUTO_APPROVE_NEWS).
+#   news_backlog     — the reviewed `cookies approve-news --apply` batch.
+#   unknown          — not recorded: rows that predate these columns (their
+#                      history is never inferred or backfilled), and any
+#                      write that does not declare a path.
+# No path has a reviewer identity to store except discord_approval; the
+# others leave approved_by NULL rather than inventing one.
+APPROVAL_METHOD_DISCORD = "discord_approval"
+APPROVAL_METHOD_SWEEP = "sweep_72h"
+APPROVAL_METHOD_NEWS_AUTO = "news_auto"
+APPROVAL_METHOD_NEWS_BACKLOG = "news_backlog"
+APPROVAL_METHOD_UNKNOWN = "unknown"
+APPROVAL_METHODS = (
+    APPROVAL_METHOD_DISCORD,
+    APPROVAL_METHOD_SWEEP,
+    APPROVAL_METHOD_NEWS_AUTO,
+    APPROVAL_METHOD_NEWS_BACKLOG,
+    APPROVAL_METHOD_UNKNOWN,
+)
+_APPROVAL_METHODS_SQL = "(" + ",".join(f"'{m}'" for m in APPROVAL_METHODS) + ")"
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS sources (
     id          TEXT PRIMARY KEY,
@@ -181,8 +211,32 @@ def init_db(path: str | Path, *, migrate: bool = False) -> sqlite3.Connection:
     conn.commit()
     conn._migrating = False
     foundation.migrate(conn)
+    _ensure_approval_columns(conn)
     foundation.validate_contract(conn)
     return conn
+
+
+def _ensure_approval_columns(conn: sqlite3.Connection) -> None:
+    """Add the approval-provenance columns to an existing `cookies` table.
+
+    Runs after foundation.migrate so the writer triggers installed by the
+    structural migration keep the column list production already has:
+    write_events JSON stays stable across environments while the structural
+    payloads (which read SELECT *) capture the new columns.  Additive and
+    idempotent; existing rows keep unknown history unknown — the DEFAULT
+    fills them, nothing is inferred or backfilled.
+    """
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(cookies)")}
+    if "approval_method" not in cols:
+        conn.execute(
+            "ALTER TABLE cookies ADD COLUMN approval_method TEXT NOT NULL "
+            f"DEFAULT 'unknown' CHECK (approval_method IN {_APPROVAL_METHODS_SQL})"
+        )
+    if "approved_by" not in cols:
+        conn.execute("ALTER TABLE cookies ADD COLUMN approved_by TEXT")
+    if "approved_at" not in cols:
+        conn.execute("ALTER TABLE cookies ADD COLUMN approved_at TEXT")
+    conn.commit()
 
 
 def _dump_refs(refs: list[FolioRef]) -> str:
@@ -266,17 +320,43 @@ def get_source(conn: sqlite3.Connection, source_id: str) -> Source | None:
 
 
 @foundation.atomic
-def save_cookie(conn: sqlite3.Connection, cookie: Cookie, *, commit: bool = True) -> None:
-    """Write the cookie row plus its cookie_sources links."""
+def save_cookie(
+    conn: sqlite3.Connection,
+    cookie: Cookie,
+    *,
+    commit: bool = True,
+    approval_method: str = APPROVAL_METHOD_UNKNOWN,
+    approved_by: str | None = None,
+    approved_at: datetime | None = None,
+) -> None:
+    """Write the cookie row plus its cookie_sources links.
+
+    approval_method/approved_by/approved_at record how this cookie was
+    admitted (see APPROVAL_METHODS).  They are written on first insert only:
+    the ON CONFLICT upsert never touches them, so re-ingesting a source,
+    replaying a batch, or maintenance re-saves cannot clear or change
+    provenance already recorded for a live cookie.
+    """
+    if approval_method not in APPROVAL_METHODS:
+        raise ValueError(f"unknown approval_method {approval_method!r}")
     foundation.check_revision(conn, cookie.id, cookie.revision)
     # admitted_at defaults to now if not set (e.g. direct test inserts).
     admitted = cookie.admitted_at or datetime.now(timezone.utc)
+    # Approval clock: an explicit time wins; a declared admission path
+    # without one is approved now; an undeclared write claims no time.
+    approved_iso = (
+        approved_at.isoformat()
+        if approved_at is not None
+        else (datetime.now(timezone.utc).isoformat()
+              if approval_method != APPROVAL_METHOD_UNKNOWN else None)
+    )
     conn.execute(
         """
         INSERT INTO cookies (id, headline, summary, why_it_matters, significance,
                              folio_areas, folio_entities, folio_concepts, unresolved,
-                             is_duplicate, duplicate_of, created_at, admitted_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             is_duplicate, duplicate_of, created_at, admitted_at,
+                             approval_method, approved_by, approved_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (id) DO UPDATE SET
             headline = excluded.headline,
             summary = excluded.summary,
@@ -305,6 +385,9 @@ def save_cookie(conn: sqlite3.Connection, cookie: Cookie, *, commit: bool = True
             cookie.duplicate_of,
             cookie.created_at.isoformat(),
             admitted.isoformat(),
+            approval_method,
+            approved_by,
+            approved_iso,
         ),
     )
     conn.executemany(
@@ -422,13 +505,25 @@ def set_pending_discord_msg_id(
 
 
 @foundation.atomic
-def promote_pending_cookie(conn: sqlite3.Connection, cookie_id: str, *, expected_fingerprint=None) -> Cookie | None:
+def promote_pending_cookie(
+    conn: sqlite3.Connection,
+    cookie_id: str,
+    *,
+    expected_fingerprint=None,
+    approval_method: str,
+    approved_by: str | None = None,
+    approved_at: datetime | None = None,
+) -> Cookie | None:
     """Move a pending cookie to the live cookies table.
 
-    Copies all cookie fields, creates cookie_sources links, and deletes
-    the pending row.  Returns the promoted Cookie, or None if the pending
+    Copies all cookie fields, creates cookie_sources links, records how
+    this admission happened (approval_method is required — every promotion
+    path must declare itself; see APPROVAL_METHODS), and deletes the
+    pending row.  Returns the promoted Cookie, or None if the pending
     row doesn't exist or was already promoted.
     """
+    if approval_method not in APPROVAL_METHODS:
+        raise ValueError(f"unknown approval_method {approval_method!r}")
     row = get_pending_cookie(conn, cookie_id)
     if row is None:
         return None
@@ -460,12 +555,18 @@ def promote_pending_cookie(conn: sqlite3.Connection, cookie_id: str, *, expected
     # Insert into live cookies + source links.
     # admitted_at = now() — the entry date into the live database.
     now_iso = datetime.now(timezone.utc).isoformat()
+    approved_iso = (
+        approved_at.isoformat()
+        if approved_at is not None
+        else (now_iso if approval_method != APPROVAL_METHOD_UNKNOWN else None)
+    )
     conn.execute(
         """
         INSERT INTO cookies (id, headline, summary, why_it_matters, significance,
                              folio_areas, folio_entities, folio_concepts, unresolved,
-                             is_duplicate, duplicate_of, created_at, admitted_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)
+                             is_duplicate, duplicate_of, created_at, admitted_at,
+                             approval_method, approved_by, approved_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?)
         """,
         (
             cookie.id,
@@ -479,6 +580,9 @@ def promote_pending_cookie(conn: sqlite3.Connection, cookie_id: str, *, expected
             json.dumps(cookie.unresolved),
             cookie.created_at.isoformat(),
             now_iso,
+            approval_method,
+            approved_by,
+            approved_iso,
         ),
     )
     conn.executemany(
@@ -633,10 +737,10 @@ def auto_approve_pending(
 ) -> list[str]:
     """Promote all pending cookies older than max_age_hours to live cookies.
 
-    Returns the list of promoted cookie IDs.  Sets auto_approved=1 on
-    each before promoting (for audit tracking — the fact that it was
-    auto-approved is lost when the pending row is deleted, so we log
-    this separately if needed).
+    Returns the list of promoted cookie IDs.  Sets auto_approved=1 on each
+    pending row before promoting, and records approval_method='sweep_72h'
+    on the live row — the promotion itself now durably records that the
+    72-hour sweep (not a person and not news auto-approval) admitted it.
     """
     rows = list_auto_approvable(conn, max_age_hours, exclude_news=exclude_news)
     promoted: list[str] = []
@@ -647,7 +751,9 @@ def auto_approve_pending(
             (row["id"],),
         )
         conn.commit()
-        cookie = promote_pending_cookie(conn, row["id"])
+        cookie = promote_pending_cookie(
+            conn, row["id"], approval_method=APPROVAL_METHOD_SWEEP
+        )
         if cookie is not None:
             promoted.append(cookie.id)
     return promoted
