@@ -69,6 +69,45 @@ explicit policy; absence of a legacy receipt is not permission for paid inferenc
 The new receipt records configured extractor identity, not a claim to reconstruct
 historical prompts or model versions.
 
+## Approval provenance on live cookies
+
+The legacy `cookies` table carries three additive columns recording how each
+live cookie was admitted: `approval_method` (fixed vocabulary), `approved_by`
+(Discord user ID, human approvals only) and `approved_at`:
+
+| Value | Path |
+| --- | --- |
+| `discord_approval` | Approve button via the review webhook server (scripts/cookies-approval-server.py). |
+| `sweep_72h` | The shared 72-hour pending age sweep (`auto_approve_pending`). |
+| `news_auto` | Immediate validated admission of new news in the pipeline (`COOKIES_AUTO_APPROVE_NEWS`). |
+| `news_backlog` | The reviewed `cookies approve-news --apply` batch. |
+| `unknown` | Not recorded — rows that predate the columns, and undeclared writes. |
+
+The columns are added by a lightweight `ALTER TABLE` in `init_db` (the
+`admitted_at` precedent), deliberately *after* the structural migration so the
+installed writer triggers keep the column list production already has.
+Existing rows read `unknown`/NULL through the column defaults — no history is
+inferred or backfilled, and `migrate_copy` fails a copy whose newly added
+columns carry anything else. Legacy-equivalence comparisons
+(`migrate_copy`, `prepare_rollback`) project exactly these three columns out;
+the full `digest()`/`manifest()` never does.
+
+Provenance is written on first insert only: the `save_cookie` upsert's
+`ON CONFLICT ... DO UPDATE` never touches the three columns, so re-ingesting
+a source, replaying a batch or maintenance re-saves cannot clear or change
+them. `promote_pending_cookie` requires every promotion path to declare its
+method. The fields are deliberately excluded from the `Cookie` model, so the
+public export (allowlisted columns), the site and the feeds cannot leak a
+reviewer identity.
+
+Known limitation, recorded rather than papered over: on databases whose
+structural migration predates these columns, the private `write_events`
+before/after JSON for `cookies` rows is still built from the old column list,
+so it does not include the provenance columns until some future migration
+explicitly rebuilds the versioned triggers. The structural history captures
+them regardless: `insight_versions`/`presentation_revisions` payloads read
+`SELECT *` and include the new columns from the first writer capture.
+
 ## Migration and rehearsal
 
 Use the existing runtime and private paths:

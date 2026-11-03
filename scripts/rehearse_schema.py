@@ -34,8 +34,26 @@ def main():
     conn = db.init_db(migrated)
     report["foundation_counts"] = {t: conn.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
         for t in ("stories", "insights", "documents", "input_observations", "presentation_revisions", "legacy_identities", "review_events", "relationship_assessments", "processing_receipts")}
-    report["legacy_unknowns_preserved"] = conn.execute("SELECT count(*) FROM input_observations WHERE input_kind IS NOT NULL OR input_projection IS NOT NULL OR date_basis IS NOT NULL").fetchone()[0] == 0
     conn.close()
+
+    def _known_observation_provenance(path):
+        check = readonly(path)
+        try:
+            return check.execute(
+                "SELECT count(*) FROM input_observations WHERE input_kind IS NOT NULL"
+                " OR input_projection IS NOT NULL OR date_basis IS NOT NULL"
+            ).fetchone()[0]
+        finally:
+            check.close()
+
+    # Production legitimately records input provenance for sources observed
+    # after the structural cutover (writer captures).  The invariant is that
+    # the migration invents or drops none of it — not that the database
+    # holds zero known provenance, which stopped holding once live cycles
+    # ran on the migrated schema.
+    report["legacy_unknowns_preserved"] = (
+        _known_observation_provenance(migrated) == _known_observation_provenance(baseline)
+    )
     export_clock = datetime.now(timezone.utc)
     report["fixed_export_clock_utc"] = export_clock.isoformat()
     for name, path in (("before", baseline), ("after", migrated)):
@@ -64,7 +82,8 @@ def main():
         if pending:
             row = pending[0]
             db.update_pending_cookie_text(conn, row["id"], summary=row["summary"] + " [private rehearsal]", expected_fingerprint=db.pending_fingerprint(row))
-            db.promote_pending_cookie(conn, row["id"], expected_fingerprint=db.pending_fingerprint(db.get_pending_cookie(conn, row["id"])))
+            # Rehearsal writer exercise, not any production admission path.
+            db.promote_pending_cookie(conn, row["id"], expected_fingerprint=db.pending_fingerprint(db.get_pending_cookie(conn, row["id"])), approval_method="unknown")
         item = db.all_cookies(conn)[0]
         stale = item.model_copy(deep=True)
         item.summary += " [private rehearsal]"

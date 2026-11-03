@@ -330,3 +330,42 @@ class TestMetadataAndFts:
             exported.close()
         for forbidden in ("pending_cookies", "rejected_cookies", "sources", "cookie_sources", "judgment_meta"):
             assert forbidden not in tables
+
+class TestApprovalProvenancePrivacy:
+    def test_reviewer_and_method_never_reach_the_public_export(self, conn, tmp_path):
+        s1 = make_source(conn, url="https://src/1")
+        add_live_cookie(
+            conn,
+            cookie_id="c-reviewed",
+            source_id=s1,
+            admitted=datetime(2026, 8, 25, 10, 0, tzinfo=timezone.utc),
+        )
+        # a human-reviewed live cookie carries provenance in production
+        conn.execute(
+            """
+            UPDATE cookies SET approval_method='discord_approval',
+                               approved_by='123456789012345678',
+                               approved_at='2026-08-25T10:00:00+00:00'
+            WHERE id='c-reviewed'
+            """
+        )
+        out = tmp_path / "out.db"
+        export_public_db(tmp_path / "cookies.db", out)
+        exported = sqlite3.connect(out)
+        try:
+            cols = [r[1] for r in exported.execute("PRAGMA table_info(cookies)")]
+            for forbidden in ("approval_method", "approved_by", "approved_at"):
+                assert forbidden not in cols
+            tables = [
+                r[0]
+                for r in exported.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            ]
+            for table in tables:
+                for row in exported.execute(f"SELECT * FROM {table}"):
+                    assert "123456789012345678" not in json.dumps(
+                        [str(v) for v in row]
+                    ), f"reviewer id leaked via {table}"
+        finally:
+            exported.close()

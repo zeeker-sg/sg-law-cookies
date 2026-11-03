@@ -287,3 +287,22 @@ def test_cli_build_prints_page_count(populated, tmp_path, monkeypatch, capsys):
     captured = capsys.readouterr()
     assert "built 9 pages" in captured.out
     assert (out / "index.html").exists()
+
+
+def test_reviewer_identity_never_reaches_the_site(conn, tmp_path):
+    src = _source()
+    cookie = _cookie(conn, src)
+    # a human-reviewed live cookie carries reviewer provenance in production
+    conn.execute(
+        "UPDATE cookies SET approval_method='discord_approval',"
+        " approved_by='123456789012345678' WHERE id=?",
+        (cookie.id,),
+    )
+    conn.commit()
+    out = tmp_path / "dist-private"
+    build_site(conn, out, BASE_URL)
+    files = [p for p in out.rglob("*") if p.is_file()]
+    assert files  # the site actually built
+    for path in files:
+        assert "123456789012345678" not in path.read_text(), path
+        assert "discord_approval" not in path.read_text(), path

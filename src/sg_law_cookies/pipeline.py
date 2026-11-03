@@ -171,7 +171,9 @@ def process_news(
                 from sg_law_cookies.news_approval import validate_news_cookie
 
                 validate_news_cookie(conn, cookie)
-                db.save_cookie(conn, cookie)
+                db.save_cookie(
+                    conn, cookie, approval_method=db.APPROVAL_METHOD_NEWS_AUTO
+                )
                 recent.append(cookie)
             else:
                 db.save_pending_cookie(
